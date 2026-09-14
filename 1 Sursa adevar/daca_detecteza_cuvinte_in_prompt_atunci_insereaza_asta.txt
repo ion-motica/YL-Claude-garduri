@@ -1,0 +1,23 @@
+/*
+in acest fisier
+setezi ce texte vrei sa inserezi autiamat in promturile claude,
+ca si ii amintesti ce nu isi aminteste el singur din fisierele .md.
+
+Ai urmatoarele 2 "functii":
+
+1. insereazaInToatePrompturile { ... }
+   insereaza continutul blocului la fiecare prompt trimis.
+2. dacaGaseste(A | B | C)
+   atunciIncludeInPrompt("...")
+
+poti comnenta linii pt a le anula pana scoti commntul iar
+
+*/
+
+insereazaInToatePrompturile {
+    ...
+}
+
+
+dacaGaseste(CP | control panel | panou de control)
+atunciIncludeInPrompt("...")
