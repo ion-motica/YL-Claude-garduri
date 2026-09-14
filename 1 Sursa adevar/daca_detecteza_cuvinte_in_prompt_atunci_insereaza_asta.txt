@@ -15,13 +15,15 @@ Poti comnenta linii pt a le anula pana scoti commntul iar.
 
 */
 
-insereazaInToatePrompturile {
-    ...
-}
+/*
+insereazaInToatePrompturile {{
 
+
+}}
+*/
 
 dacaGaseste(CP | control panel | panou de control)
-atunciIncludeInPrompt {{Pentru control panels folosește motorul central existent "js/motor-optiuni-control-panel.js" și configurația declarativă. Nu crea implementare manuală paralelă. Dacă motorul nu acoperă cerința, semnalează problema înainte să alegi alt traseu.")
+atunciIncludeInPrompt {{Pentru control panels folosește motorul central existent "js/motor-optiuni-control-panel.js" și configurația declarativă. Nu crea implementare manuală paralelă. Dacă motorul nu acoperă cerința, semnalează problema înainte să alegi alt traseu.}}
 
 dacaGaseste(crc)
    atunciIncludeInPrompt {{Dacă cerința curentă intră în conflict cu o regulă, arhitectură sau constrângere existentă a proiectului, NU rezolva conflictul pe cont propriu. Semnalează conflictul și cere decizia utilizatorului înainte de modificare.}}
