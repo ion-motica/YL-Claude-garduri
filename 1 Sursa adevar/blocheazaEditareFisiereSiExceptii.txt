@@ -19,6 +19,10 @@ trebuie sa citeasca regulile de aici, nu din liste duplicate.
 */
 
 blocheazaEditareFisiereSiFoldere {
+  js/motor-optiuni-control-panel.js
+  js/cp-shell.js
+  js/cp-registry.js
+  .github/workflows/yl-guard.yml
 }
 
 permiteEditarePanaLa(2026.09.15-18.00 Europe/Bucharest) {
