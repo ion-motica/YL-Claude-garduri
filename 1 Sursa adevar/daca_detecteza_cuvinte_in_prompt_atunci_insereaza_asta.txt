@@ -1,16 +1,17 @@
 /*
 in acest fisier
-setezi ce texte vrei sa inserezi autiamat in promturile claude,
-ca si ii amintesti ce nu isi aminteste el singur din fisierele .md.
+setezi ce texte vrei sa inserezi automat in prompturile claude,
+ca sa ii amintesti ce nu isi aminteste el singur din fisierele .md.
 
 Ai urmatoarele 2 "functii":
 
-1. insereazaInToatePrompturile { ... }
+1. insereazaInToatePrompturile {{ }}
    insereaza continutul blocului la fiecare prompt trimis.
 2. dacaGaseste(A | B | C)
-   atunciIncludeInPrompt("...")
+   atunciIncludeInPrompt {{ }}
 
-poti comnenta linii pt a le anula pana scoti commntul iar
+
+Poti comnenta linii pt a le anula pana scoti commntul iar.
 
 */
 
@@ -20,4 +21,9 @@ insereazaInToatePrompturile {
 
 
 dacaGaseste(CP | control panel | panou de control)
-atunciIncludeInPrompt("...")
+atunciIncludeInPrompt {{Pentru control panels folosește motorul central existent "js/motor-optiuni-control-panel.js" și configurația declarativă. Nu crea implementare manuală paralelă. Dacă motorul nu acoperă cerința, semnalează problema înainte să alegi alt traseu.")
+
+dacaGaseste(crc)
+   atunciIncludeInPrompt {{Dacă cerința curentă intră în conflict cu o regulă, arhitectură sau constrângere existentă a proiectului, NU rezolva conflictul pe cont propriu. Semnalează conflictul și cere decizia utilizatorului înainte de modificare.}}
+
+
