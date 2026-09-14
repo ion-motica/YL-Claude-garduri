@@ -1,0 +1,28 @@
+/*
+Acest fisier contine 
+SURSA UNICA DE ADEVAR pentru 
+protectia la editare a fisierelor si folderelor.
+
+Hookurile si verificarile 
+trebuie sa citeasca regulile de aici, nu din liste duplicate.
+
+-poti folosi comments ca in js
+-poti anula o protectie de fisier daca comentezi linia/liniile respective
+
+
+
+- blocheazaEditareFisiereSiFoldere { ... }
+- permiteEditarePanaLa(DATA-ORA Europe/Bucharest) { ... }
+- permiteEditareTOT_REPOSITORYPanaLa(DATA-ORA Europe/Bucharest) { }
+
+
+*/
+
+blocheazaEditareFisiereSiFoldere {
+}
+
+permiteEditarePanaLa(2026.09.15-18.00 Europe/Bucharest) {
+}
+
+permiteEditareTOT_REPOSITORYPanaLa(2026.09.15-18.00 Europe/Bucharest) {
+}
