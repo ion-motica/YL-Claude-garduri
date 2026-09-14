@@ -1,0 +1,13 @@
+{
+  "name": "yl-garduri",
+  "owner": {
+    "name": "ion-motica"
+  },
+  "plugins": [
+    {
+      "name": "yl-claude-garduri",
+      "source": ".",
+      "description": "Garduri configurabile pentru Claude Code."
+    }
+  ]
+}
