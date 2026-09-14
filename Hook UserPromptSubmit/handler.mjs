@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  FILE_PROTECTIE,
   FILE_REMINDERE,
   validateAll,
   validateRemindere,
-  formatAnnouncement,
 } from "./config-validator.mjs";
 import {
   parseReminderConfig,
@@ -21,6 +21,9 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, "..");
 const SOURCE_DIR = path.join(ROOT, "1 Sursa adevar");
 const REMINDERS_PATH = path.join(SOURCE_DIR, FILE_REMINDERE);
+const REPO_NAME = "YL-Claude-garduri";
+const SOURCE_RELATIVE_DIR = "1 Sursa adevar";
+const VALIDATED_FILES = [FILE_PROTECTIE, FILE_REMINDERE];
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -31,15 +34,55 @@ function readStdin() {
   });
 }
 
+function repoPath(file) {
+  return `${SOURCE_RELATIVE_DIR}/${file}`;
+}
+
+function errorsForFile(errors, file) {
+  return errors.filter((e) => e.file === file);
+}
+
 function formatValidatorForDisplay(errors) {
-  if (errors.length === 0) return "VALIDATOR: OK";
-  const lines = errors.slice(0, 10).map(
-    (e) => `- ${e.file}, linia ${e.line}: ${e.message}`,
-  );
-  if (errors.length > 10) {
-    lines.push(`- ... si inca ${errors.length - 10} eroare/erori.`);
+  const lines = [];
+
+  for (const file of VALIDATED_FILES) {
+    const fileErrors = errorsForFile(errors, file);
+    if (fileErrors.length === 0) {
+      lines.push(`validare ok pt repo ${REPO_NAME}, ${repoPath(file)}`);
+      continue;
+    }
+
+    lines.push(`eroare in repo ${REPO_NAME}, ${repoPath(file)}`);
+    for (const e of fileErrors.slice(0, 10)) {
+      lines.push(`  linia ${e.line}: ${e.message}`);
+    }
+    if (fileErrors.length > 10) {
+      lines.push(`  ... si inca ${fileErrors.length - 10} eroare/erori.`);
+    }
   }
-  return `VALIDATOR: EROARE (${errors.length})\n${lines.join("\n")}`;
+
+  return lines.join("\n");
+}
+
+function formatErrorAnnouncement(errors) {
+  if (errors.length === 0) return "";
+
+  const lines = ["ANUNTA UTILIZATORUL CA:"];
+  for (const file of VALIDATED_FILES) {
+    const fileErrors = errorsForFile(errors, file);
+    if (fileErrors.length === 0) continue;
+
+    lines.push(`eroare in repo ${REPO_NAME}, ${repoPath(file)}`);
+    for (const e of fileErrors.slice(0, 10)) {
+      lines.push(`linia ${e.line}: ${e.message}`);
+    }
+    if (fileErrors.length > 10) {
+      lines.push(`... si inca ${fileErrors.length - 10} eroare/erori.`);
+    }
+  }
+
+  lines.push("Nu presupune ce trebuia sa scrie utilizatorul. Nu folosi regula invalida pana nu este corectata.");
+  return lines.join("\n");
 }
 
 const stdinText = await readStdin();
@@ -77,7 +120,7 @@ const display = [
 
 const contextParts = [];
 if (allErrors.length > 0) {
-  contextParts.push(formatAnnouncement(allErrors));
+  contextParts.push(formatErrorAnnouncement(allErrors));
 }
 if (injectedContext) {
   contextParts.push(injectedContext);
