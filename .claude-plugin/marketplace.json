@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "yl-claude-garduri",
-      "source": ".",
+      "source": "./",
       "description": "Garduri configurabile pentru Claude Code."
     }
   ]
