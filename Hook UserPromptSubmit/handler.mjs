@@ -15,6 +15,7 @@ import {
   formatInjectedForContext,
   formatInjectedForDisplay,
 } from "./reminder-engine.mjs";
+import { formatComponentPresence } from "../shared/claude-notice.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,7 @@ const REMINDERS_PATH = path.join(SOURCE_DIR, FILE_REMINDERE);
 const REPO_NAME = "YL-Claude-garduri";
 const SOURCE_RELATIVE_DIR = "1 Sursa adevar";
 const VALIDATED_FILES = [FILE_PROTECTIE, FILE_REMINDERE];
+const COMPONENT_NAME = "Hook UserPromptSubmit - Remindere";
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -113,7 +115,7 @@ try {
 
 const injectedContext = formatInjectedForContext(selected);
 const display = [
-  "YL-GUARD",
+  formatComponentPresence(COMPONENT_NAME, ROOT),
   formatValidatorForDisplay(allErrors),
   formatInjectedForDisplay(selected),
 ].join("\n\n");
