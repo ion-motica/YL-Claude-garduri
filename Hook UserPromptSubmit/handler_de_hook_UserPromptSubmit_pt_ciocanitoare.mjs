@@ -106,6 +106,14 @@ function formatActiuneHookPentruNotice(selected) {
   return lines.join("\n");
 }
 
+// TEST DE AFISARE:
+// Claude Code pune "UserPromptSubmit says:" in fata fiecarei linii separate prin newline.
+// Pentru acest test scoatem TOATE newline-urile doar din systemMessage-ul vizibil si
+// le inlocuim cu spatii. Contextul injectat catre Claude ramane neschimbat.
+function noticePeUnSingurRand(text) {
+  return String(text).replace(/\s*\r?\n+\s*/g, "     ");
+}
+
 const stdinText = await readStdin();
 let input = {};
 try {
@@ -132,11 +140,12 @@ try {
 }
 
 const injectedContext = formatInjectedForContext(selected);
-const display = [
+const displayCuStructuraNormala = [
   formatActiuneHookPentruNotice(selected),
   `VALIDARE CONFIGURATIE:\n${formatValidatorForDisplay(allErrors)}`,
   `PREZENTA COMPONENTEI:\n${formatComponentPresence(PLUGIN_NAME, ROOT)}`,
 ].join("\n\n");
+const display = noticePeUnSingurRand(displayCuStructuraNormala);
 
 const contextParts = [];
 if (allErrors.length > 0) {
