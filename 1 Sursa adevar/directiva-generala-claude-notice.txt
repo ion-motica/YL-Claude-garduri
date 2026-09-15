@@ -1,5 +1,5 @@
 /*
-DIRECTIVA GENERALA DE OBSERVABILITATE
+DIRECTIVA GENERALA DE OBSERVABILITATE SI DENUMIRE
 pentru toate gardurile YL-Claude-garduri.
 
 Indiferent de denumirea tehnica a mecanismului
@@ -9,20 +9,56 @@ trebuie sa isi semnaleze vizibil prezenta in sectiunea
 "Claude Code notice" de sub prompt.
 */
 
-Orice componenta activa trebuie sa afiseze cel putin:
+REGULA GENERALA DE DENUMIRE
 
-<Numele componentei>,
-instalat in <locul real din care ruleaza>
+Pentru numele alese de noi, prefera denumiri lungi,
+ne-generice si auto-explicative, care spun simultan:
+- ce categorie de obiect este;
+- ce rol concret are obiectul.
+
+Exemple aprobate:
+- handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs
+- motor_alegere_reminder_de_inserat.mjs
+- reminder_ciocanitoare_injectat_in_prompt
+
+Numele tehnice impuse de Claude Code raman neschimbate,
+de exemplu UserPromptSubmit, PreToolUse, Stop etc.
+
+Fisierul existent
+"1 Sursa adevar/daca_detecteza_cuvinte_in_prompt_atunci_insereaza_asta.txt"
+ramane cu aceasta denumire; nu il redenumi doar pentru uniformizare.
+
+ORGANIZAREA TEXTULUI DIN CLAUDE CODE NOTICE
+
+1. La inceput spune ce hook a fost declansat, ce program al nostru
+a rulat si ce actiune a facut.
+
+Exemplu de forma:
+Hookul "UserPromptSubmit" a declansat programul nostru
+"handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs".
+Programul a folosit modulul "motor_alegere_reminder_de_inserat.mjs".
+Programul a injectat in prompt:
+reminder_ciocanitoare_injectat_in_prompt (...):
+<textul efectiv injectat>
+
+Daca nu s-a injectat nimic, spune explicit acest lucru.
+
+2. Dupa actiune pot aparea informatiile de stare relevante,
+de exemplu validator OK/eroare, fisier blocat, teste etc.
+
+3. LA SFARSIT apare sectiunea de prezenta a componentei,
+cu numele tehnic al componentei, locul real din care ruleaza
+si confirmarea ca functioneaza aici.
+
+Exemplu:
+PREZENTA COMPONENTEI:
+Componenta tehnica: yl-claude-garduri@skills-dir
+instalata in /root/.claude/skills/yl-claude-garduri
 functioneaza aici.
-
-Daca mecanismul executa o actiune in acel moment,
-notice-ul trebuie sa arate si rezultatul relevant,
-de exemplu trigger detectat, reminder injectat,
-validator OK/eroare, fisier blocat etc.
 
 Mesajul de prezenta se afiseaza si cand totul este OK,
 nu doar cand exista eroare.
 
-Scop: utilizatorul sa poata vedea imediat daca gardul
-este incarcat si ruleaza in sesiunea curenta, fara sa
-presupuna si fara diagnostic separat.
+Scop: utilizatorul sa poata intelege imediat CE obiect tehnic
+a facut CE actiune, prin CE program/modul, si de unde ruleaza,
+fara sa tina arhitectura tehnica in memorie si fara diagnostic separat.
