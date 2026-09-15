@@ -1,7 +1,7 @@
 export function formatComponentPresence(componentName, installRoot) {
   return [
-    `${componentName},`,
-    `instalat in ${installRoot}`,
+    `Componenta tehnica: ${componentName}`,
+    `instalata in ${installRoot}`,
     "functioneaza aici.",
   ].join("\n");
 }
