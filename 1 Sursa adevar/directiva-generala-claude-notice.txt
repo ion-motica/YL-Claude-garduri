@@ -1,0 +1,28 @@
+/*
+DIRECTIVA GENERALA DE OBSERVABILITATE
+pentru toate gardurile YL-Claude-garduri.
+
+Indiferent de denumirea tehnica a mecanismului
+(hook, plugin, skill, validator, guard, script etc.),
+daca este facut de noi si ruleaza efectiv in Claude,
+trebuie sa isi semnaleze vizibil prezenta in sectiunea
+"Claude Code notice" de sub prompt.
+*/
+
+Orice componenta activa trebuie sa afiseze cel putin:
+
+<Numele componentei>,
+instalat in <locul real din care ruleaza>
+functioneaza aici.
+
+Daca mecanismul executa o actiune in acel moment,
+notice-ul trebuie sa arate si rezultatul relevant,
+de exemplu trigger detectat, reminder injectat,
+validator OK/eroare, fisier blocat etc.
+
+Mesajul de prezenta se afiseaza si cand totul este OK,
+nu doar cand exista eroare.
+
+Scop: utilizatorul sa poata vedea imediat daca gardul
+este incarcat si ruleaza in sesiunea curenta, fara sa
+presupuna si fara diagnostic separat.
