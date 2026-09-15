@@ -107,11 +107,10 @@ function formatActiuneHookPentruNotice(selected) {
 }
 
 // TEST DE AFISARE:
-// Claude Code pune "UserPromptSubmit says:" in fata fiecarei linii separate prin newline.
-// Pentru acest test scoatem TOATE newline-urile doar din systemMessage-ul vizibil si
-// le inlocuim cu spatii. Contextul injectat catre Claude ramane neschimbat.
+// Scoatem TOATE newline-urile doar din systemMessage-ul vizibil si le inlocuim
+// cu un delimitator non-whitespace. Contextul injectat catre Claude ramane neschimbat.
 function noticePeUnSingurRand(text) {
-  return String(text).replace(/\s*\r?\n+\s*/g, "     ");
+  return String(text).replace(/\s*\r?\n+\s*/g, " | ");
 }
 
 const stdinText = await readStdin();
