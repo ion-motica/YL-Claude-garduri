@@ -5,7 +5,7 @@ import {
   triggerMatches,
   formatInjectedForContext,
   formatInjectedForDisplay,
-} from "../Hook UserPromptSubmit/reminder-engine.mjs";
+} from "../Hook UserPromptSubmit/motor_alegere_reminder_de_inserat.mjs";
 
 const raw = `
 /* bloc dezactivat
