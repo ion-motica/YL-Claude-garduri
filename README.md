@@ -2,75 +2,91 @@
 
 Garduri externe pentru Claude Code Web folosit pe YouLearn.
 
-## Arhitectura folosita acum
+## Instalare
 
-In Claude Code Web, gardurile sunt instalate ca **skills-directory plugin** in:
+Pluginul ruleaza ca skills-directory plugin din:
 
 ```text
 ~/.claude/skills/yl-claude-garduri
 ```
 
-Repo-ul contine `.claude-plugin/plugin.json` si `hooks/hooks.json`, deci Claude Code il poate incarca drept:
+si este incarcat ca:
 
 ```text
 yl-claude-garduri@skills-dir
 ```
 
-Cloud Environment-ul dedicat este:
+Cloud Environment-ul dedicat este `YL-garduri`. `cloud-environment-setup.sh` este bootstrap-ul initial; el nu este mecanismul curent de refresh la fiecare prompt.
+
+## Portarul stabil de actualizare
+
+`UserPromptSubmit` intra prin:
 
 ```text
-YL-garduri
+Hook UserPromptSubmit/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs
 ```
 
-### Bootstrap-ul environmentului
+Calea acestui fisier este infrastructura stabila: nu trebuie stearsa sau redenumita intr-un update obisnuit.
 
-`cloud-environment-setup.sh` instaleaza codul gardurilor in snapshot-ul environmentului. Setup scripturile Cloud Environment sunt cache-uite de Claude Code Web, deci NU trebuie folosite ca mecanism de refresh pentru reguli care se schimba des.
+La fiecare prompt, portarul:
 
-Scriptul de bootstrap:
+1. verifica SHA-ul `origin/main` prin `git ls-remote`;
+2. daca SHA-ul remote este identic cu HEAD local, nu face fetch;
+3. daca SHA-ul difera, face `git fetch --depth=1 origin main`;
+4. compara exact fisierele schimbate cu `git diff --name-status`;
+5. valideaza piesele critice si cele doua fisiere din `1 Sursa adevar`;
+6. actualizeaza intreaga copie locala a pluginului la `FETCH_HEAD`;
+7. detecteaza explicit hookuri noi, skills noi si componente/foldere noi necunoscute ("barzauni");
+8. lanseaza handlerul UserPromptSubmit din versiunea tocmai actualizata.
 
-1. cloneaza o copie noua intr-un folder temporar;
-2. verifica piesele minime ale pluginului;
-3. abia apoi inlocuieste instalarea `yl-claude-garduri`;
-4. sterge vechiul `personal-reminders` numai dupa instalarea reusita;
-5. scrie markerul diagnostic `~/.claude/skills/YL_SETUP_RULAT.txt` cu commitul instalat.
-
-## Sincronizarea regulilor TXT la fiecare prompt
-
-Cele doua fisiere de configurare care trebuie sa poata fi editate rapid pe GitHub sunt:
+Consecinta:
 
 ```text
-1 Sursa adevar/blocheazaEditareFisiereSiExceptii.txt
-1 Sursa adevar/daca_detecteza_cuvinte_in_prompt_atunci_insereaza_asta.txt
+modifici TXT sau cod in YL-Claude-garduri/main
+→ trimiti urmatorul prompt
+→ daca SHA-ul s-a schimbat, portarul face fetch + update
+→ handlerul nou / regulile noi sunt folosite pentru acel prompt
 ```
 
-Ele NU depind de reconstruirea cache-ului Cloud Environment.
+## Cand este necesar /reload-plugins
 
-La fiecare `UserPromptSubmit`, inainte ca Claude sa proceseze promptul, programul:
+Portarul poate actualiza fisierele locale, dar Claude Code incarca anumite componente de plugin separat. Daca diff-ul atinge configuratia hookurilor sau alte componente care necesita reincarcare, Claude Code notice spune explicit:
 
 ```text
-Hook UserPromptSubmit/program_sincronizare_fisiere_sursa_adevar_din_GitHub_inainte_de_fiecare_prompt.mjs
+/reload-plugins NECESAR
 ```
 
-face urmatoarele:
+Sunt detectate, intre altele:
 
-1. `git fetch --depth=1 origin main` in repo-ul local al gardurilor;
-2. citeste cele doua fisiere din `FETCH_HEAD`;
-3. valideaza AMBELE versiuni remote inainte de a modifica fisierele locale;
-4. daca sunt valide, actualizeaza numai fisierele care s-au schimbat;
-5. daca GitHub nu poate fi verificat sau configuratia remote este invalida, NU suprascrie ultima copie locala valida;
-6. afiseaza rezultatul sincronizarii in `Claude Code notice`;
-7. abia apoi validatorul si motorul de remindere folosesc copiile locale rezultate.
+- `hooks/` si `.claude-plugin/`;
+- hookuri noi `Hook .../`;
+- `skills/` si skills noi;
+- `agents/`, `commands/`, MCP, LSP, monitors, output styles, themes;
+- orice folder/componenta noua necunoscuta ("barzaun nou").
 
-Consecinta dorita:
+Modificarile obisnuite de cod ale handlerelor/motoarelor sunt actualizate pe disk si handlerul UserPromptSubmit este lansat dupa update. Pentru componentele pe care Claude Code le incarca structural, Notice-ul cere reload in loc sa pretinda ca sunt deja active.
+
+## Claude Code notice
+
+Notice-ul incepe cu rezultatul util:
 
 ```text
-editezi TXT pe GitHub
-→ trimiti urmatorul prompt, chiar in acelasi chat
-→ UserPromptSubmit verifica GitHub
-→ regula noua valida este folosita chiar pentru acel prompt
+S-a inserat: CP=<...> ; crc=<...>
 ```
 
-Modificarile de COD ale pluginului (handler, module JS, hooks.json etc.) raman alta categorie: ele pot necesita reconstruirea cache-ului environmentului / restartul sau reload-ul pluginului. Sincronizarea per-prompt este deliberat limitata la cele doua fisiere TXT sursa de adevar.
+sau:
+
+```text
+S-a inserat: nimic.
+```
+
+Abia dupa aceea apar verificarile tehnice: status update GitHub, commit verificat, schimbari detectate, hookuri/skills/barzauni noi, necesitatea de reload, validatorul si prezenta componentei.
+
+Sursa explicita a regulii de afisare este:
+
+```text
+1 Sursa adevar/directiva-generala-claude-notice.txt
+```
 
 ## Verificare dupa instalare
 
@@ -80,27 +96,4 @@ Intr-o sesiune Claude Code Web cu environmentul `YL-garduri`:
 claude plugin list
 ```
 
-Trebuie sa apara:
-
-```text
-yl-claude-garduri@skills-dir
-Status: loaded
-```
-
-Apoi trimite un prompt care corespunde unui trigger din fisierul de remindere. Hookul `UserPromptSubmit` trebuie sa afiseze in **Claude Code notice**:
-
-- programul principal si programul de sincronizare;
-- statusul sincronizarii cu GitHub;
-- validarea configuratiei locale folosite pentru promptul curent;
-- reminderul injectat, daca exista;
-- la final, componenta tehnica si locul real din care ruleaza.
-
-## Directiva generala Claude Notice
-
-Orice mecanism facut de noi care ruleaza efectiv in Claude — hook, plugin, skill, validator, guard, script etc. — trebuie sa isi semnaleze vizibil prezenta in `Claude Code notice`.
-
-Sursa explicita a acestei reguli este:
-
-```text
-1 Sursa adevar/directiva-generala-claude-notice.txt
-```
+Trebuie sa apara `yl-claude-garduri@skills-dir` cu status loaded. La urmatorul prompt, Notice-ul trebuie sa arate si statusul portarului de actualizare.
