@@ -3,7 +3,7 @@ import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:f
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { actualizeazaPluginul } from "../Hook UserPromptSubmit/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs";
+import { actualizeazaPluginul } from "../Hook UserPromptSubmit - cand trimit prompt/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs";
 
 function git(root, args) {
   return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });

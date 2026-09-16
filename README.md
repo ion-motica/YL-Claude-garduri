@@ -23,7 +23,7 @@ Cloud Environment-ul dedicat este `YL-garduri`. `cloud-environment-setup.sh` est
 `UserPromptSubmit` intra prin:
 
 ```text
-Hook UserPromptSubmit/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs
+Hook UserPromptSubmit - cand trimit prompt/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs
 ```
 
 Calea acestui fisier este infrastructura stabila: nu trebuie stearsa sau redenumita intr-un update obisnuit.
