@@ -26,10 +26,10 @@ dacaGaseste(buton | apasare | turn )
    atunciIncludeInPrompt {{ 
 Atentie la structura apasarii de butoane cand am variante de raspuns:
 Cand apare o intrebare, copilul apasa pe un buton cu o varianta de raspuns.
-DAca apasa pe o varinata gresita atunci NU TRECE NICIODATA la alta intrebare, ci asteapta alta apasare de buton ramanand la aceeasi intrbare.
-Quizul trece la altaq intrebare sau s termina doar dupa ce copilul a apasat pe vairnta CORECTA DE RASPUNS.
-Deci userul poate sa apese de 15000 de ori pe butonale cu variante gresite , quizul ramane la aceeasi intrebare. Acest este un turn: o intrebre cu intre 1 si 15000+ apasari de buton, intotdeauna finalizat cu raspunsul corect.
-Feicare apasare de buton se logheaza, dar nu inseamna ca daca s-a logat o apasare pe un buton cu o varianta de raspuns s-a tremint intrebarea, c regurla este INTOTDEAUNA: setrece la alta nitrebare doar daca s-a raspuns apasand pe butonul curaspunsul corect.
+Daca apasa pe o varianta gresita atunci NU TRECE NICIODATA la alta intrebare, ci asteapta alta apasare de buton ramanand la aceeasi intrebare.
+Quizul trece la alta intrebare sau se termina doar dupa ce copilul a apasat pe varianta CORECTA DE RASPUNS.
+Deci userul poate sa apese de 15000 de ori pe butoanele cu variante gresite , quizul ramane la aceeasi intrebare. Acesta este un turn: o intrebare cu intre 1 si 15000+ apasari de buton, intotdeauna finalizat cu raspunsul corect.
+Fiecare apasare de buton se logheaza, dar nu inseamna ca daca s-a logat o apasare pe un buton cu o varianta de raspuns s-a terminat intrebarea, ci regula este INTOTDEAUNA: se trece la alta intrebare doar daca s-a raspuns apasand pe butonul cu raspunsul corect.
 }}
 
 
