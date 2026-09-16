@@ -22,6 +22,11 @@ insereazaInToatePrompturile {{
 }}
 */
 
+dacaGaseste(test22)
+   atunciIncludeInPrompt {{ test22!!!!!!!!!!!!!!!!!!!!!!!!!!!! }}
+
+
+
 dacaGaseste(buton | apasare | turn )
    atunciIncludeInPrompt {{ 
 Atentie la structura apasarii de butoane cand am variante de raspuns:
