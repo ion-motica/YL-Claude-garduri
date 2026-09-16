@@ -89,32 +89,37 @@ function formatErrorAnnouncement(errors) {
   return lines.join("\n");
 }
 
-function formatActiuneHookPentruNotice(selected, syncResult) {
-  const lines = [
-    `Hookul "${HOOK_NAME}" a declansat programul nostru "${PROGRAM_NAME}".`,
-    `Programul a folosit modulul "${MOTOR_NAME}".`,
-    `Programul a folosit programul "${PROGRAM_SINCRONIZARE_NAME}" pentru a verifica sursa de adevar din GitHub inainte de acest prompt.`,
-    "",
-    formatSincronizarePentruNotice(syncResult),
-  ];
+function etichetaReminderPentruNotice(item) {
+  if (item.kind === "toate") return "TOATE";
+  if (Array.isArray(item.matched) && item.matched.length > 0) {
+    return item.matched.join("/");
+  }
+  return "trigger";
+}
 
+function formatInserariPentruNotice(selected) {
   if (selected.length === 0) {
-    lines.push("");
-    lines.push("Programul nu a injectat niciun reminder_ciocanitoare_injectat_in_prompt.");
-    return lines.join("\n");
+    return "S-a inserat: nimic.";
   }
 
-  lines.push("");
-  lines.push("Programul a injectat in prompt:");
-  selected.forEach((item, index) => {
-    const cauza = item.kind === "toate"
-      ? "regula: toate prompturile"
-      : `trigger: ${item.matched.join(" | ")}`;
-    lines.push("");
-    lines.push(`[${index + 1}] reminder_ciocanitoare_injectat_in_prompt (${cauza}):`);
-    lines.push(item.body);
-  });
+  const lines = ["S-a inserat:"];
+  for (const item of selected) {
+    lines.push(`${etichetaReminderPentruNotice(item)}=${item.body}`);
+  }
   return lines.join("\n");
+}
+
+function formatVerificareTehnicaPentruNotice(syncResult, allErrors) {
+  return [
+    "VERIFICARE TEHNICA:",
+    formatSincronizarePentruNotice(syncResult),
+    `VALIDARE CONFIGURATIE LOCALA FOLOSITA ACUM:\n${formatValidatorForDisplay(allErrors)}`,
+    `Hook activ: ${HOOK_NAME}`,
+    `Program hook: ${PROGRAM_NAME}`,
+    `Motor remindere: ${MOTOR_NAME}`,
+    `Program sincronizare: ${PROGRAM_SINCRONIZARE_NAME}`,
+    `PREZENTA COMPONENTEI:\n${formatComponentPresence(PLUGIN_NAME, ROOT)}`,
+  ].join("\n\n");
 }
 
 function noticePeUnSingurRand(text) {
@@ -151,9 +156,8 @@ try {
 
 const injectedContext = formatInjectedForContext(selected);
 const displayCuStructuraNormala = [
-  formatActiuneHookPentruNotice(selected, syncResult),
-  `VALIDARE CONFIGURATIE LOCALA FOLOSITA ACUM:\n${formatValidatorForDisplay(allErrors)}`,
-  `PREZENTA COMPONENTEI:\n${formatComponentPresence(PLUGIN_NAME, ROOT)}`,
+  formatInserariPentruNotice(selected),
+  formatVerificareTehnicaPentruNotice(syncResult, allErrors),
 ].join("\n\n");
 const display = noticePeUnSingurRand(displayCuStructuraNormala);
 
