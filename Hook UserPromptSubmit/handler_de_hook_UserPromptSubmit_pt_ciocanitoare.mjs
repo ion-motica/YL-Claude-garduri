@@ -102,11 +102,10 @@ function formatInserariPentruNotice(selected) {
     return "S-a inserat: nimic.";
   }
 
-  const lines = ["S-a inserat:"];
-  for (const item of selected) {
-    lines.push(`${etichetaReminderPentruNotice(item)}=${item.body}`);
-  }
-  return lines.join("\n");
+  const inserari = selected.map(
+    (item) => `${etichetaReminderPentruNotice(item)}=${item.body}`,
+  );
+  return `S-a inserat: ${inserari.join(" ; ")}`;
 }
 
 function formatVerificareTehnicaPentruNotice(syncResult, allErrors) {
