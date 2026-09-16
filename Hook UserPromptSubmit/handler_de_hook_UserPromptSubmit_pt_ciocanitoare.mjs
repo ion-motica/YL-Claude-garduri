@@ -14,11 +14,6 @@ import {
   readLastAssistantMessage,
   formatInjectedForContext,
 } from "./motor_alegere_reminder_de_inserat.mjs";
-import {
-  sincronizeazaFisiereleSursaAdevarDinGitHub,
-  formatSincronizarePentruNotice,
-  formatSincronizareProblemaPentruContext,
-} from "./program_sincronizare_fisiere_sursa_adevar_din_GitHub_inainte_de_fiecare_prompt.mjs";
 import { formatComponentPresence } from "../shared/claude-notice.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,8 +27,9 @@ const VALIDATED_FILES = [FILE_PROTECTIE, FILE_REMINDERE];
 const HOOK_NAME = "UserPromptSubmit";
 const PROGRAM_NAME = "handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs";
 const MOTOR_NAME = "motor_alegere_reminder_de_inserat.mjs";
-const PROGRAM_SINCRONIZARE_NAME = "program_sincronizare_fisiere_sursa_adevar_din_GitHub_inainte_de_fiecare_prompt.mjs";
+const PORTAR_NAME = "program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs";
 const PLUGIN_NAME = "yl-claude-garduri@skills-dir";
+const STATUS_ENV = "YL_GARDURI_STATUS_ACTUALIZARE_PLUGIN";
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -89,6 +85,40 @@ function formatErrorAnnouncement(errors) {
   return lines.join("\n");
 }
 
+function citesteStatusActualizarePlugin() {
+  const raw = process.env[STATUS_ENV];
+  if (!raw) {
+    return {
+      status: "handler_rulat_fara_portar",
+      remoteCommit: null,
+      mesaj: "handlerul a fost rulat direct; statusul actualizarii pluginului nu este disponibil.",
+      schimbari: [],
+      componenteNoi: [],
+      hookuriNoi: [],
+      skilluriNoi: [],
+      barzauniNoi: [],
+      reloadNecesar: false,
+      motiveReload: [],
+    };
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {
+      status: "status_portar_invalid",
+      remoteCommit: null,
+      mesaj: "nu am putut interpreta statusul primit de la portarul de actualizare.",
+      schimbari: [],
+      componenteNoi: [],
+      hookuriNoi: [],
+      skilluriNoi: [],
+      barzauniNoi: [],
+      reloadNecesar: false,
+      motiveReload: [],
+    };
+  }
+}
+
 function etichetaReminderPentruNotice(item) {
   if (item.kind === "toate") return "TOATE";
   if (Array.isArray(item.matched) && item.matched.length > 0) {
@@ -101,22 +131,52 @@ function formatInserariPentruNotice(selected) {
   if (selected.length === 0) {
     return "S-a inserat: nimic.";
   }
-
-  const inserari = selected.map(
-    (item) => `${etichetaReminderPentruNotice(item)}=${item.body}`,
-  );
+  const inserari = selected.map((item) => `${etichetaReminderPentruNotice(item)}=${item.body}`);
   return `S-a inserat: ${inserari.join(" ; ")}`;
 }
 
-function formatVerificareTehnicaPentruNotice(syncResult, allErrors) {
+function listaScurta(valori, limita = 10) {
+  if (!Array.isArray(valori) || valori.length === 0) return "";
+  const afisate = valori.slice(0, limita);
+  const extra = valori.length > limita ? ` ; ... +${valori.length - limita}` : "";
+  return `${afisate.join(" ; ")}${extra}`;
+}
+
+function formatActualizarePluginPentruNotice(status) {
+  const commit = status?.remoteCommit ? String(status.remoteCommit).slice(0, 12) : "necunoscut";
+  const lines = [
+    "ACTUALIZARE GARDURI DIN GITHUB:",
+    `rezultat: ${status?.status || "necunoscut"}`,
+    `commit GitHub verificat: ${commit}`,
+    status?.mesaj || "fara mesaj",
+  ];
+
+  if (status?.schimbari?.length) {
+    const schimbari = status.schimbari.map((x) => `${x.status}:${x.path}`);
+    lines.push(`schimbari detectate: ${listaScurta(schimbari, 15)}`);
+  }
+  if (status?.hookuriNoi?.length) lines.push(`HOOKURI NOI detectate: ${listaScurta(status.hookuriNoi)}`);
+  if (status?.skilluriNoi?.length) lines.push(`SKILLS NOI detectate: ${listaScurta(status.skilluriNoi)}`);
+  if (status?.barzauniNoi?.length) lines.push(`BARZAUNI/COMPONENTE NOI necunoscute detectate: ${listaScurta(status.barzauniNoi)}`);
+  if (status?.componenteNoi?.length) lines.push(`componente/foldere noi: ${listaScurta(status.componenteNoi)}`);
+
+  if (status?.reloadNecesar) {
+    lines.push("/reload-plugins NECESAR pentru ca noile/modificatele componente de plugin sa fie incarcate in sesiunea curenta.");
+    if (status.motiveReload?.length) lines.push(`motive reload: ${listaScurta(status.motiveReload, 10)}`);
+  }
+
+  return lines.join("\n");
+}
+
+function formatVerificareTehnicaPentruNotice(statusActualizare, allErrors) {
   return [
     "VERIFICARE TEHNICA:",
-    formatSincronizarePentruNotice(syncResult),
+    formatActualizarePluginPentruNotice(statusActualizare),
     `VALIDARE CONFIGURATIE LOCALA FOLOSITA ACUM:\n${formatValidatorForDisplay(allErrors)}`,
     `Hook activ: ${HOOK_NAME}`,
+    `Portar actualizare: ${PORTAR_NAME}`,
     `Program hook: ${PROGRAM_NAME}`,
     `Motor remindere: ${MOTOR_NAME}`,
-    `Program sincronizare: ${PROGRAM_SINCRONIZARE_NAME}`,
     `PREZENTA COMPONENTEI:\n${formatComponentPresence(PLUGIN_NAME, ROOT)}`,
   ].join("\n\n");
 }
@@ -133,9 +193,7 @@ try {
   input = {};
 }
 
-// IMPORTANT: sincronizarea se face INAINTE de validare si selectie,
-// astfel incat chiar promptul curent sa foloseasca ultima versiune valida din GitHub.
-const syncResult = sincronizeazaFisiereleSursaAdevarDinGitHub({ root: ROOT });
+const statusActualizare = citesteStatusActualizarePlugin();
 const allErrors = validateAll();
 let selected = [];
 let reminderFileErrors = [];
@@ -156,14 +214,26 @@ try {
 const injectedContext = formatInjectedForContext(selected);
 const displayCuStructuraNormala = [
   formatInserariPentruNotice(selected),
-  formatVerificareTehnicaPentruNotice(syncResult, allErrors),
+  formatVerificareTehnicaPentruNotice(statusActualizare, allErrors),
 ].join("\n\n");
 const display = noticePeUnSingurRand(displayCuStructuraNormala);
 
 const contextParts = [];
-const syncProblemContext = formatSincronizareProblemaPentruContext(syncResult);
-if (syncProblemContext) {
-  contextParts.push(syncProblemContext);
+if (statusActualizare?.reloadNecesar) {
+  contextParts.push([
+    "ANUNTA UTILIZATORUL CA:",
+    "Actualizarea YL-Claude-garduri a detectat componente de plugin noi/modificate care nu devin active sigur doar prin schimbarea fisierelor locale.",
+    "Este necesar /reload-plugins in sesiunea curenta inainte sa pretinzi ca noile hookuri/skills/componente sunt active.",
+    statusActualizare.motiveReload?.length ? `Motive: ${statusActualizare.motiveReload.join(" ; ")}` : "",
+  ].filter(Boolean).join("\n"));
+}
+if (["verificare_remote_esuat", "fetch_esuat", "remote_invalid", "comparare_esuat", "actualizare_esuat"].includes(statusActualizare?.status)) {
+  contextParts.push([
+    "ANUNTA UTILIZATORUL CA:",
+    `Actualizarea automata YL-Claude-garduri are status ${statusActualizare.status}.`,
+    statusActualizare.mesaj || "",
+    "Nu pretinde ca ruleaza ultima versiune GitHub daca actualizarea nu a reusit.",
+  ].join("\n"));
 }
 if (allErrors.length > 0) {
   contextParts.push(formatErrorAnnouncement(allErrors));
