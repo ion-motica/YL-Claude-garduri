@@ -30,21 +30,36 @@ ramane cu aceasta denumire; nu il redenumi doar pentru uniformizare.
 
 ORGANIZAREA TEXTULUI DIN CLAUDE CODE NOTICE
 
-1. La inceput spune ce hook a fost declansat, ce program al nostru
-a rulat si ce actiune a facut.
+1. INTAI se afiseaza rezultatul util pentru user, nu detaliile tehnice.
 
-Exemplu de forma:
-Hookul "UserPromptSubmit" a declansat programul nostru
-"handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs".
-Programul a folosit modulul "motor_alegere_reminder_de_inserat.mjs".
-Programul a injectat in prompt:
-reminder_ciocanitoare_injectat_in_prompt (...):
-<textul efectiv injectat>
+Pentru UserPromptSubmit / ciocanitoare, forma incepe cu:
 
-Daca nu s-a injectat nimic, spune explicit acest lucru.
+S-a inserat:
+CP=<textul reminderului CP>
+crc=<textul reminderului crc>
+...
 
-2. Dupa actiune pot aparea informatiile de stare relevante,
-de exemplu validator OK/eroare, fisier blocat, teste etc.
+Se afiseaza numai reminderele care au fost efectiv inserate.
+Daca nu s-a inserat niciun reminder, forma este scurta:
+
+S-a inserat: nimic.
+
+Scopul acestei prime parti este ca userul sa poata vedea imediat
+CE regula/reminder a ajuns in prompt, fara sa citeasca mai intai
+informatii despre hookuri, fisiere, commituri sau instalare.
+
+2. DUPA rezultatul util pentru user apar verificarile tehnice relevante.
+
+Aici intra, dupa caz:
+- statusul sincronizarii sursei de adevar din GitHub;
+- commitul GitHub verificat;
+- validator OK/eroare;
+- ce hook a rulat;
+- ce program/modul a fost folosit;
+- alte verificari de functionare ale mecanismelor noastre.
+
+Aceste informatii sunt grupate ca verificare tehnica si NU preced
+rezultatul util pentru user.
 
 3. LA SFARSIT apare sectiunea de prezenta a componentei,
 cu numele tehnic al componentei, locul real din care ruleaza
@@ -59,6 +74,6 @@ functioneaza aici.
 Mesajul de prezenta se afiseaza si cand totul este OK,
 nu doar cand exista eroare.
 
-Scop: utilizatorul sa poata intelege imediat CE obiect tehnic
-a facut CE actiune, prin CE program/modul, si de unde ruleaza,
-fara sa tina arhitectura tehnica in memorie si fara diagnostic separat.
+Scop general: userul vede mai intai CE S-A FACUT pentru promptul curent,
+iar detaliile tehnice de verificare a functionarii instalatiilor noastre
+raman in partea finala a Claude Code notice.
