@@ -7,7 +7,7 @@ import {
   FILE_REMINDERE,
   validateAll,
   validateRemindere,
-} from "./config-validator.mjs";
+} from "../Hook UserPromptSubmit - cand trimit prompt update all garduri din github/config-validator.mjs";
 import {
   parseReminderConfig,
   selectReminders,

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {
   parseazaDiffNameStatus,
   clasificaSchimbariPlugin,
-} from "../Hook UserPromptSubmit - cand trimit prompt insereaza reminder/motor_detectare_hooks_skills_si_componente_noi_la_actualizare.mjs";
+} from "../Hook UserPromptSubmit - cand trimit prompt update all garduri din github/motor_detectare_hooks_skills_si_componente_noi_la_actualizare.mjs";
 
 const raw = [
   "M\t1 Sursa adevar/daca_detecteza_cuvinte_in_prompt_atunci_insereaza_asta.txt",

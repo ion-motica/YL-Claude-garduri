@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { validateProtectie, validateRemindere } from "../Hook UserPromptSubmit - cand trimit prompt insereaza reminder/config-validator.mjs";
+import { validateProtectie, validateRemindere } from "../Hook UserPromptSubmit - cand trimit prompt update all garduri din github/config-validator.mjs";
 
 const protectOk = `
 /* comment */

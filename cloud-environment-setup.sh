@@ -17,11 +17,16 @@ git clone --depth 1 "${REPO_URL}" "${TEMP_PLUGIN}"
 # Nu inlocui instalarea existenta pana cand noua copie nu are piesele minime de plugin.
 test -f "${TEMP_PLUGIN}/.claude-plugin/plugin.json"
 test -f "${TEMP_PLUGIN}/hooks/hooks.json"
-test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit - cand trimit prompt insereaza reminder/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs"
-test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit - cand trimit prompt insereaza reminder/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs"
+
+# UserPromptSubmit: actiunea globala de update pentru toate gardurile.
+test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit - cand trimit prompt update all garduri din github/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs"
+test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit - cand trimit prompt update all garduri din github/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs"
+test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit - cand trimit prompt update all garduri din github/motor_detectare_hooks_skills_si_componente_noi_la_actualizare.mjs"
+test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit - cand trimit prompt update all garduri din github/config-validator.mjs"
+
+# UserPromptSubmit: actiunea separata de inserare a reminderelor.
 test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit - cand trimit prompt insereaza reminder/program_ciocanitoare_dupa_actualizarea_gardurilor.mjs"
 test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit - cand trimit prompt insereaza reminder/motor_alegere_reminder_de_inserat.mjs"
-test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit - cand trimit prompt insereaza reminder/motor_detectare_hooks_skills_si_componente_noi_la_actualizare.mjs"
 
 echo "[YL-GUARD setup] instalare noua verificata; o activez ca skills-directory plugin..."
 rm -rf "${NEW_PLUGIN}"

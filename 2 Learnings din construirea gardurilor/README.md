@@ -8,11 +8,9 @@ Scopul acestui folder este sa pastreze ce am invatat factual construind garduril
 
 In chatul Claude Code Web deja deschis, `UserPromptSubmit` continua sa cheme calea pe care a incarcat-o la pornirea sesiunii.
 
-Calea stabila folosita acum este:
+Principiul ramane:
 
-`Hook UserPromptSubmit - cand trimit prompt insereaza reminder/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs`
-
-Consecinta: nu trebuie sa schimbam `hooks.json` pentru actualizarile obisnuite. Pastram aceeasi usa, iar codul din spatele ei se poate actualiza.
+`hook deja inregistrat -> cale stabila -> cod actualizabil in spate`
 
 ### 1.2 Update-ul din GitHub functioneaza in acelasi chat
 
@@ -43,65 +41,107 @@ Daca SHA local = SHA GitHub si copia runtime este curata:
 
 Nu construim arhitectura pe presupunerea ca `/reload-plugins` este disponibil in Claude Code Web remote.
 
-Cand o schimbare necesita reincarcarea structurii de plugin, mesajul corect pentru utilizator este `SESIUNE/CHAT NOU NECESAR`, nu instructiunea de a folosi `/reload-plugins`.
+Cand o schimbare necesita reincarcarea structurii de plugin, mesajul corect pentru utilizator este `SESIUNE/CHAT NOU NECESAR`.
 
 ### 1.5 Hook complet nou versus cod nou intr-un hook existent
 
 Diferenta importanta:
 
-- modificare de cod in spatele unei usi/hook deja incarcate -> poate deveni activa la urmatorul prompt;
-- hook complet nou, adica un eveniment nou adaugat in `hooks.json` -> fisierele pot fi descarcate, dar sesiunea curenta nu poate fi considerata sigur activata pentru acel hook; trebuie chat/sesiune noua.
+- modificare de cod in spatele unui hook deja incarcat -> poate deveni activa la urmatorul prompt;
+- hook complet nou, adica eveniment nou adaugat in `hooks.json` -> fisierele pot fi descarcate, dar activarea sigura cere chat/sesiune noua.
 
 Detectorul trebuie sa anunte explicit aceasta situatie in Claude Code notice.
 
-## 2. Regula de arhitectura: priza stabila, cod schimbabil in spate
+## 2. Conventie noua: `Hook X - cand Y fa Z`
 
-Principiul de baza pentru Claude Code Web:
+Pentru memoria umana, numele folderului trebuie sa spuna direct:
 
-`hook deja inregistrat -> cale stabila -> cod actualizabil in spate`
+- ce hook tehnic este;
+- cand se declanseaza;
+- ce actiune face.
 
-Nu schimbam inutil calea pe care Claude o cunoaste deja.
+Forma canonica:
 
-Pentru `UserPromptSubmit`, doua piese sunt tratate ca bootstrap stabil:
+```text
+Hook X - cand Y fa Z
+```
 
-- `Hook UserPromptSubmit - cand trimit prompt insereaza reminder/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs`
-- `Hook UserPromptSubmit - cand trimit prompt insereaza reminder/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs`
+Daca acelasi hook tehnic face mai multe actiuni, preferam cate un folder separat pentru fiecare actiune, in loc sa amestecam toate responsabilitatile intr-un singur folder.
+
+Exemplul UserPromptSubmit este acum separat astfel:
+
+```text
+Hook UserPromptSubmit - cand trimit prompt update all garduri din github/
+Hook UserPromptSubmit - cand trimit prompt insereaza reminder/
+```
+
+Acestea NU sunt doua evenimente Claude diferite. Sunt doua actiuni ale aceluiasi `UserPromptSubmit`.
+
+Claude Code pastreaza o singura intrare stabila pentru `UserPromptSubmit`; intrarea face mai intai update-ul global si apoi ruleaza actiunea de reminder.
+
+## 3. Update-ul GitHub este infrastructura comuna tuturor gardurilor
+
+Actiunea:
+
+```text
+Hook UserPromptSubmit - cand trimit prompt update all garduri din github/
+```
+
+nu apartine semantic reminderelor. Ea sincronizeaza intreaga infrastructura `YL-Claude-garduri` si trebuie tratata ca serviciu comun pentru toate hookurile viitoare.
+
+Fluxul tinta:
+
+```text
+trimit prompt
+-> verifica GitHub
+-> daca e nevoie actualizeaza toate gardurile
+-> ruleaza actiunile UserPromptSubmit
+-> hookurile ulterioare din flux folosesc copia deja actualizata
+```
+
+Nu duplicam verificarea GitHub in `PreToolUse`, `PostToolUseFailure`, `TaskCompleted`, `Stop` etc. Doar daca vom descoperi factual un eveniment care poate rula relevant fara sa fi existat inainte un UserPromptSubmit, reevaluam acea exceptie.
+
+## 4. Bootstrap stabil
+
+In noua separare, bootstrap-ul stabil al UserPromptSubmit este in folderul de update global:
+
+- `Hook UserPromptSubmit - cand trimit prompt update all garduri din github/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs`
+- `Hook UserPromptSubmit - cand trimit prompt update all garduri din github/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs`
 
 Aceste doua fisiere NU se autoactualizeaza peste ele insele. Daca GitHub le modifica, portarul se opreste cu status `bootstrap_stabil_schimbat` si cere instalare explicita.
 
 Motiv: updaterul nu trebuie sa-si inlocuiasca singur chiar piesele prin care se actualizeaza.
 
-## 3. Protectii invatate prin red-team
+## 5. Protectii invatate prin red-team
 
 Updaterul nu trebuie sa faca un `reset --hard` orb.
 
 Inainte de update:
 
 - verifica daca runtime-ul are modificari locale necomise; daca da, se opreste si nu le sterge;
-- verifica daca `origin` este exact repo-ul asteptat;
-- verifica relatia dintre commitul local si GitHub main; istoric neasteptat/force-push/commit local separat -> se opreste;
-- valideaza cele doua fisiere din `1 Sursa adevar` inainte de instalare;
+- verifica daca `origin` este repo-ul asteptat;
+- verifica relatia dintre commitul local si GitHub main;
+- valideaza fisierele din `1 Sursa adevar` inainte de instalare;
 - verifica JSON-urile critice;
 - verifica sintaxa fisierelor runtime `.mjs` din versiunea GitHub inainte de instalare;
 - verifica existenta pieselor critice;
-- daca versiunea noua se instaleaza dar programul de lucru esueaza, incearca revenirea la commitul local anterior, fara a calca peste modificari locale.
+- daca versiunea noua se instaleaza dar programul urmator esueaza, incearca revenirea la commitul local anterior, fara a calca peste modificari locale.
 
 Principiul general: GitHub este sursa canonica, dar copia runtime nu se distruge tacit daca exista ceva local neasteptat.
 
-## 4. Ce se actualizeaza automat si ce nu
+## 6. Ce se actualizeaza automat si ce nu
 
 ### Se poate actualiza automat la urmatorul prompt
 
 - fisierele din `1 Sursa adevar`;
 - motoare si validatoare `.mjs` obisnuite;
-- programul ciocanitoare care ruleaza dupa update;
-- cod comun din spatele hookului deja activ;
+- programe din spatele hookurilor deja active;
 - alte fisiere runtime care nu sunt bootstrap-ul stabil si nu cer reinregistrare de plugin.
 
 ### Nu se autoactualizeaza intentionat
 
-- `handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs`;
-- `program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs`.
+- handlerul stabil UserPromptSubmit;
+- portarul de update global.
 
 Acestea cer instalare explicita daca sunt modificate.
 
@@ -111,7 +151,7 @@ Acestea cer instalare explicita daca sunt modificate.
 - manifest/plugin/configuratii structurale pe care Claude le incarca la pornirea sesiunii;
 - alte componente pe care detectorul le clasifica drept necesitand sesiune noua.
 
-## 5. Observabilitate obligatorie
+## 7. Observabilitate obligatorie
 
 Orice componenta construita de noi care ruleaza efectiv in Claude trebuie sa-si anunte prezenta in `Claude Code notice`.
 
@@ -125,11 +165,11 @@ Pentru UserPromptSubmit ordinea utila este:
 6. numele componentelor care au rulat;
 7. locatia runtime si `functioneaza aici`.
 
-Nu trebuie sa cerem utilizatorului sa retina limite tehnice care pot fi detectate automat. Daca apare hook nou / componenta structurala noua, Notice-ul trebuie sa spuna asta.
+Nu trebuie sa cerem utilizatorului sa retina limite tehnice care pot fi detectate automat.
 
-## 6. Dovezi de acceptare deja obtinute
+## 8. Dovezi de acceptare deja obtinute
 
-Runtime verificat manual in Claude Code Web:
+Runtime verificat manual in Claude Code Web inainte de separarea pe cele doua foldere:
 
 - commit instalat si `git status` curat;
 - `node --check` PASS pentru bootstrap;
@@ -137,15 +177,4 @@ Runtime verificat manual in Claude Code Web:
 - test `test33`: `deja_la_zi`, commit GitHub real, regula corecta;
 - test `test44` dupa commit nou in GitHub: `actualizat`, schimbare TXT detectata, regula noua folosita in acelasi chat.
 
-Aceste teste sunt referinta de regresie: nu trebuie pierdut comportamentul demonstrat aici cand extindem gardurile.
-
-## 7. Lectie de design pentru continuare
-
-Pentru fiecare gard nou, separa doua lucruri:
-
-1. **priza Claude Code** — evenimentul/hookul pe care Claude trebuie sa-l aiba inregistrat;
-2. **programul nostru din spatele prizei** — logica pe care o putem schimba si testa mult mai liber.
-
-Tinta este sa avem putine prize stabile si multa logica modulara in spatele lor.
-
-Astfel, modificarea unui gard nu trebuie sa forteze constant chat nou; chat nou ramane exceptia pentru o priza complet noua sau o schimbare structurala de plugin.
+Dupa separarea pe `update all garduri` + `insereaza reminder`, bateria si comportamentul end-to-end trebuie rerulate intr-un runtime nou. Pana atunci nu confundam validarea structurii GitHub cu validarea runtime a noii cablari.
