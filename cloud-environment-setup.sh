@@ -19,6 +19,7 @@ test -f "${TEMP_PLUGIN}/.claude-plugin/plugin.json"
 test -f "${TEMP_PLUGIN}/hooks/hooks.json"
 test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs"
 test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit/motor_alegere_reminder_de_inserat.mjs"
+test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit/program_sincronizare_fisiere_sursa_adevar_din_GitHub_inainte_de_fiecare_prompt.mjs"
 
 echo "[YL-GUARD setup] instalare noua verificata; o activez ca skills-directory plugin..."
 rm -rf "${NEW_PLUGIN}"
