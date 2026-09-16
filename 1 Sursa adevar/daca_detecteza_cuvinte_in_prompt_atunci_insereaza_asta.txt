@@ -22,8 +22,8 @@ insereazaInToatePrompturile {{
 }}
 */
 
-dacaGaseste(test22)
-   atunciIncludeInPrompt {{ test22!!!!!!!!!!!!!!!!!!!!!!!!!!!! }}
+dacaGaseste(test33)
+   atunciIncludeInPrompt {{ test3333333333333333333333333333333333333 }}
 
 
 
