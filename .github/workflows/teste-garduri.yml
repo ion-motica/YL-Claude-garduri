@@ -1,0 +1,45 @@
+name: Teste garduri
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  teste-garduri:
+    name: teste-garduri
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verifica sintaxa tuturor fisierelor MJS
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            echo "node --check $file"
+            node --check "$file"
+          done < <(find . -type f -name '*.mjs' -not -path './node_modules/*' -not -path './.git/*' -print0)
+
+      - name: Ruleaza bateria de teste
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test_file in tests/*.test.mjs; do
+            echo "=== $test_file ==="
+            node "$test_file"
+          done
