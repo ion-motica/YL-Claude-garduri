@@ -20,6 +20,7 @@ function incepeCu(p, prefix) {
 
 function categoriePentruPath(p) {
   if (incepeCu(p, "1 Sursa adevar")) return "sursa_adevar";
+  if (incepeCu(p, "2 Learnings din construirea gardurilor")) return "documentatie";
   if (incepeCu(p, "hooks")) return "config_hooks";
   if (p === ".claude-plugin/plugin.json" || incepeCu(p, ".claude-plugin")) return "manifest_plugin";
   if (incepeCu(p, "skills") || p === "SKILL.md") return "skill";
