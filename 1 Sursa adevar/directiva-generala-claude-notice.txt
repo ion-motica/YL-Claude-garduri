@@ -48,8 +48,13 @@ informatii despre hookuri, fisiere, commituri sau instalare.
 2. DUPA rezultatul util pentru user apar verificarile tehnice relevante.
 
 Aici intra, dupa caz:
-- statusul sincronizarii sursei de adevar din GitHub;
+- statusul verificarii GitHub si al actualizarii intregului plugin;
 - commitul GitHub verificat;
+- lista/scurta clasificare a schimbarilor detectate;
+- HOOKURI NOI detectate;
+- SKILLS NOI detectate;
+- BARZAUNI/COMPONENTE NOI necunoscute detectate;
+- daca este necesar `/reload-plugins` si motivul concret;
 - validator OK/eroare;
 - ce hook a rulat;
 - ce program/modul a fost folosit;
@@ -70,6 +75,23 @@ functioneaza aici.
 
 Mesajul de prezenta se afiseaza si cand totul este OK,
 nu doar cand exista eroare.
+
+REGULA PORTARULUI DE ACTUALIZARE
+
+UserPromptSubmit intra prin fisierul stabil:
+"Hook UserPromptSubmit/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs".
+
+Portarul:
+- verifica la fiecare prompt SHA-ul GitHub main printr-o interogare usoara;
+- daca SHA-ul este identic cu cel local, NU face fetch;
+- daca SHA-ul difera, face fetch, compara exact fisierele schimbate si actualizeaza pluginul local;
+- verifica si raporteaza daca au aparut hookuri, skills sau alte componente/foldere noi;
+- ruleaza apoi handlerul UserPromptSubmit din versiunea tocmai actualizata;
+- daca s-a schimbat configuratia/componenta de plugin care necesita reincarcare, cere explicit `/reload-plugins`.
+
+Fisierul portar de mai sus si calea lui sunt infrastructura stabila.
+Nu il sterge si nu il redenumi intr-un update obisnuit, deoarece `hooks/hooks.json`
+il foloseste ca punct de intrare persistent.
 
 Scop general: userul vede mai intai CE S-A FACUT pentru promptul curent,
 iar detaliile tehnice de verificare a functionarii instalatiilor noastre
