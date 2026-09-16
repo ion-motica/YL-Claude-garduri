@@ -10,7 +10,7 @@ In chatul Claude Code Web deja deschis, `UserPromptSubmit` continua sa cheme cal
 
 Calea stabila folosita acum este:
 
-`Hook UserPromptSubmit/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs`
+`Hook UserPromptSubmit - cand trimit prompt insereaza reminder/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs`
 
 Consecinta: nu trebuie sa schimbam `hooks.json` pentru actualizarile obisnuite. Pastram aceeasi usa, iar codul din spatele ei se poate actualiza.
 
@@ -64,8 +64,8 @@ Nu schimbam inutil calea pe care Claude o cunoaste deja.
 
 Pentru `UserPromptSubmit`, doua piese sunt tratate ca bootstrap stabil:
 
-- `Hook UserPromptSubmit/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs`
-- `Hook UserPromptSubmit/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs`
+- `Hook UserPromptSubmit - cand trimit prompt insereaza reminder/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs`
+- `Hook UserPromptSubmit - cand trimit prompt insereaza reminder/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs`
 
 Aceste doua fisiere NU se autoactualizeaza peste ele insele. Daca GitHub le modifica, portarul se opreste cu status `bootstrap_stabil_schimbat` si cere instalare explicita.
 
