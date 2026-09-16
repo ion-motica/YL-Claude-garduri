@@ -15,18 +15,24 @@ const raw = [
 const schimbari = parseazaDiffNameStatus(raw);
 assert.equal(schimbari.length, 5);
 
-const rezultat = clasificaSchimbariPlugin(schimbari, { skillsDirExistaInainte: false });
+const rezultat = clasificaSchimbariPlugin(schimbari, { skillsDirExistaInainte: true });
 
 assert.deepEqual(rezultat.hookuriNoi, ["Hook PreToolUse"]);
 assert.deepEqual(rezultat.skilluriNoi, ["verifica-implementare"]);
 assert.deepEqual(rezultat.barzauniNoi, ["Barzaun Experimental"]);
-assert.equal(rezultat.reloadNecesar, true);
-assert.ok(rezultat.motiveReload.some((x) => x.includes("hooks/hooks.json")));
-assert.ok(rezultat.motiveReload.some((x) => x.includes("skills/")));
+assert.equal(rezultat.sesiuneNouaNecesara, true);
+assert.ok(rezultat.motiveSesiuneNoua.some((x) => x.includes("hooks/hooks.json")));
+assert.ok(rezultat.motiveSesiuneNoua.some((x) => x.includes("Barzaun Experimental")));
+
+const numaiSkillModificat = clasificaSchimbariPlugin(
+  parseazaDiffNameStatus("M\tskills/verifica-implementare/SKILL.md\n"),
+  { skillsDirExistaInainte: true },
+);
+assert.equal(numaiSkillModificat.sesiuneNouaNecesara, false);
 
 const numaiCod = clasificaSchimbariPlugin(
   parseazaDiffNameStatus("M\tHook UserPromptSubmit/motor_alegere_reminder_de_inserat.mjs\n"),
 );
-assert.equal(numaiCod.reloadNecesar, false);
+assert.equal(numaiCod.sesiuneNouaNecesara, false);
 
 console.log("DETECTARE HOOKS SKILLS COMPONENTE NOI TEST OK");
