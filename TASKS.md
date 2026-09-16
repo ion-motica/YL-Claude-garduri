@@ -3,6 +3,7 @@
 Documentatie de continuitate si learnings verificate:
 - `2 Learnings din construirea gardurilor/README.md`
 - `2 Learnings din construirea gardurilor/PLAN_CONTINUARE_GARDURI.md`
+- `2 Learnings din construirea gardurilor/CI_GITHUB_ACTIONS_TESTE_AUTOMATE.md`
 
 - [x] 1. Definitivare sursa de adevar pentru fisiere protejate si exceptii
 - [x] 2. Hook UserPromptSubmit — infrastructura + remindere
@@ -48,7 +49,9 @@ Documentatie de continuitate si learnings verificate:
   - [x] baterie runtime anterioara rulata in Claude Code: 5/5 PASS, 0 fail
   - [x] test runtime `deja_la_zi` cu commit GitHub real
   - [x] test runtime `actualizat` dupa schimbare GitHub in acelasi chat
-  - [ ] rerulare baterie dupa separarea folderelor
+  - [x] GitHub Actions automat la push pe `main` si PR: `node --check` pentru toate `.mjs` + toate `tests/*.test.mjs`
+  - [x] prima rulare GitHub Actions dupa separarea folderelor: PASS; sintaxa PASS + 5/5 teste PASS
+  - [ ] portarul instaleaza doar commituri pentru care jobul GitHub Actions `teste-garduri` este PASS
   - [ ] extindere baterie pe fiecare gard nou
 
 ## Directive transversale
