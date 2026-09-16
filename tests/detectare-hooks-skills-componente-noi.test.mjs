@@ -35,4 +35,14 @@ const numaiCod = clasificaSchimbariPlugin(
 );
 assert.equal(numaiCod.sesiuneNouaNecesara, false);
 
+const numaiDocumentatieLearnings = clasificaSchimbariPlugin(
+  parseazaDiffNameStatus([
+    "A\t2 Learnings din construirea gardurilor/README.md",
+    "A\t2 Learnings din construirea gardurilor/PLAN_CONTINUARE_GARDURI.md",
+  ].join("\n")),
+);
+assert.equal(numaiDocumentatieLearnings.sesiuneNouaNecesara, false);
+assert.deepEqual(numaiDocumentatieLearnings.barzauniNoi, []);
+assert.ok(Array.isArray(numaiDocumentatieLearnings.categorii.documentatie));
+
 console.log("DETECTARE HOOKS SKILLS COMPONENTE NOI TEST OK");
