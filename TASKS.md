@@ -6,9 +6,9 @@ Documentatie de continuitate si learnings verificate:
 
 - [x] 1. Definitivare sursa de adevar pentru fisiere protejate si exceptii
 - [x] 2. Hook UserPromptSubmit — ciocanitoare de remindere dupa cuvinte-cheie/context
-  - [x] intrare stabila: `Hook UserPromptSubmit - cand trimit prompt/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs`
-  - [x] motor selectie: `Hook UserPromptSubmit - cand trimit prompt/motor_alegere_reminder_de_inserat.mjs`
-  - [x] portar stabil la fiecare prompt: `Hook UserPromptSubmit - cand trimit prompt/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs`
+  - [x] intrare stabila: `Hook UserPromptSubmit - cand trimit prompt insereaza reminder/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs`
+  - [x] motor selectie: `Hook UserPromptSubmit - cand trimit prompt insereaza reminder/motor_alegere_reminder_de_inserat.mjs`
+  - [x] portar stabil la fiecare prompt: `Hook UserPromptSubmit - cand trimit prompt insereaza reminder/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs`
   - [x] verificare usoara a SHA-ului GitHub prin `git ls-remote`; fara fetch daca SHA-ul este identic
   - [x] la SHA diferit: fetch + diff exact + validare + update al copiei runtime
   - [x] protectie red-team: nu sterge modificari locale neasteptate; verifica origin, istoric local, fisiere critice, JSON si sintaxa `.mjs`
