@@ -350,6 +350,20 @@ export function actualizeazaPluginul({ root = ROOT } = {}) {
     return statusBaza("comparare_esuat", localInainte, fetchHead, `nu pot compara versiunea locala cu GitHub. ${eroareScurta(error)}`, {}, root);
   }
 
+  const schimbariBootstrap = schimbari.filter((x) =>
+    [ENTRY_REL, PORTAR_REL].includes(x.path) || [ENTRY_REL, PORTAR_REL].includes(x.vechi),
+  );
+  if (schimbariBootstrap.length > 0) {
+    return statusBaza(
+      "bootstrap_stabil_schimbat",
+      localInainte,
+      fetchHead,
+      `NU actualizez automat intrarea stabila/portarul care fac chiar actualizarea. Aceste piese se schimba rar si cer instalare explicita. Schimbari: ${schimbariBootstrap.map((x) => `${x.status}:${x.path}`).join(" ; ")}`,
+      { schimbari },
+      root,
+    );
+  }
+
   const clasificare = clasificaSchimbariPlugin(schimbari, {
     skillsDirExistaInainte: existsSync(path.join(root, "skills")),
   });
