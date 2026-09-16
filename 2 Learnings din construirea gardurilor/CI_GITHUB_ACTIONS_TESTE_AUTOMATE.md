@@ -4,7 +4,7 @@
 
 Mediul ChatGPT folosit pentru administrarea repo-ului nu poate fi considerat un runner de teste de incredere: uneori nu poate clona GitHub din cauza retelei/DNS. Verdictul automat pentru codul din `YL-Claude-garduri` trebuie sa fie produs de GitHub, nu de disponibilitatea mediului ChatGPT.
 
-## Implementare
+## Workflow canonic
 
 Workflow:
 
@@ -15,7 +15,7 @@ Se declanseaza automat la:
 - push pe `main`;
 - pull request catre `main`.
 
-Jobul canonic se numeste:
+Jobul canonic de test se numeste:
 
 `teste-garduri`
 
@@ -26,7 +26,57 @@ Ruleaza doua straturi:
 
 Orice eroare opreste jobul si produce FAIL.
 
-## Prima dovada
+## Reperul persistent `ci-passed`
+
+Exista ramura tehnica:
+
+`refs/heads/ci-passed`
+
+Ea NU este ramura de dezvoltare si nu se editeaza manual in fluxul normal.
+
+Dupa ce un push pe `main` termina cu PASS la jobul `teste-garduri`, al doilea job al workflow-ului, `marcheaza-ci-pass`, muta `ci-passed` exact la acel commit.
+
+Daca testele sunt in curs sau au FAIL, `ci-passed` ramane pe ultimul commit cunoscut ca bun.
+
+Astfel avem doua repere foarte simple pentru runtime:
+
+```text
+refs/heads/main       = ultima versiune propusa
+refs/heads/ci-passed  = ultima versiune care a trecut testele
+```
+
+Un update este eligibil numai cand cele doua SHA-uri sunt identice.
+
+## Gate-ul runtime
+
+Intrarea stabila UserPromptSubmit verifica inainte sa porneasca portarul:
+
+```text
+main SHA == ci-passed SHA ?
+```
+
+- DA -> CI PASS confirmat; portarul poate continua verificarea si update-ul normal.
+- NU -> NU se instaleaza main; se pastreaza ultima copie locala si se verifica din nou la promptul urmator.
+- unul dintre repere nu poate fi citit -> fail-safe: NU se actualizeaza.
+
+Statusurile introduse sunt:
+
+- `ci_pass_confirmat`;
+- `ci_main_neaprobat`;
+- `ci_verificare_esuat`;
+- `ci_runtime_local_neaprobat` pentru situatia anormala in care runtime-ul este deja pe un main care nu are marker CI PASS.
+
+Markerul evita dependenta de GitHub Actions REST API si de rate-limituri: runtime-ul foloseste doar `git ls-remote`, mecanism deja folosit pentru verificarea SHA-ului GitHub.
+
+## Bootstrap / environment
+
+`cloud-environment-setup.sh` cloneaza acum ramura `ci-passed`, nu `main`.
+
+Prin urmare si o instalare/reconstructie de environment porneste de la ultima versiune care are CI PASS, nu de la un commit main aflat eventual in curs de testare.
+
+Atentie: schimbarea scriptului din repo nu invalideaza singura cache-ul unui Cloud Environment deja construit. Pentru activarea noului bootstrap trebuie fortata reconstruirea environmentului conform procedurii Claude Code Web deja documentate, apoi deschis chat nou.
+
+## Dovezi obtinute inainte de gate
 
 Primul run GitHub Actions a rulat pentru commitul:
 
@@ -34,32 +84,14 @@ Primul run GitHub Actions a rulat pentru commitul:
 
 Rezultat: `success`.
 
-Au trecut:
+Au trecut verificarea de sintaxa pentru toate fisierele `.mjs` si toate cele 5 teste existente. Un run ulterior pentru commitul `5d40c70f4fc286dcf7ca3ebda42f82104b01d72d` a avut de asemenea `success`.
 
-- verificarea de sintaxa pentru toate fisierele `.mjs`, inclusiv noua separare `update all garduri din github` + `insereaza reminder`;
-- `tests/claude-notice.test.mjs`;
-- `tests/config-validator.test.mjs`;
-- `tests/detectare-hooks-skills-componente-noi.test.mjs`;
-- `tests/portar-siguranta-runtime.test.mjs`;
-- `tests/reminder-engine.test.mjs`.
-
-Deci bateria automata dupa separarea folderelor este verificata in GitHub, independent de mediul ChatGPT.
+Ramura `ci-passed` a fost initializata la acest ultim commit deja verificat, inainte de introducerea gate-ului automat.
 
 ## Ce NU demonstreaza CI
 
 GitHub Actions demonstreaza ca fisierele si testele automate sunt valide. Nu demonstreaza ca Claude Code Web a incarcat efectiv o cale noua de hook intr-un chat real.
 
-Pentru schimbari structurale de hook ramane necesar testul end-to-end in Claude Code Web:
+Pentru schimbari structurale de hook/bootstrap ramane necesar testul end-to-end in Claude Code Web:
 
-`environment instalat/reconstruit -> chat nou -> hook declansat -> Claude Code Notice observat -> comportament verificat`.
-
-## Directia urmatoare
-
-Urmatorul strat de siguranta propus este ca portarul de update runtime sa nu instaleze un commit GitHub nou pana cand jobul `teste-garduri` pentru acel commit nu este `success`.
-
-Stari dorite:
-
-- CI `success` -> commit eligibil pentru instalare;
-- CI in curs / inca absent -> pastreaza ultima copie locala buna si incearca din nou la promptul urmator;
-- CI FAIL -> nu instala commitul;
-- GitHub CI nu poate fi verificat -> fail-safe: nu instala commitul si anunta in Notice.
+`environment reconstruit -> chat nou -> hook declansat -> Claude Code Notice observat -> comportament verificat`.

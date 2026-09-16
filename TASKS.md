@@ -25,6 +25,8 @@ Documentatie de continuitate si learnings verificate:
   - [x] confirmare end-to-end existenta: prompt cu trigger -> reminder injectat + Claude Code notice vizibil
   - [x] bootstrap nou instalat o singura data in runtime-ul Claude Code Web; confirmat fara dependenta de `/reload-plugins`
   - [x] verificare end-to-end: schimbare TXT `test33 -> test44` -> urmatorul prompt din acelasi chat a vazut imediat versiunea noua
+  - [x] gate CI implementat: inainte de update, `main` trebuie sa fie identic cu reperul `ci-passed`
+  - [ ] activare runtime a gate-ului CI prin rebuild environment + chat nou
   - [ ] verificare end-to-end dupa separare: noua structura update-global + reminder ruleaza corect intr-un chat nou
   - [ ] verificare end-to-end: schimbare cod simplu `.mjs` -> urmatorul prompt ruleaza codul nou
   - [ ] verificare end-to-end: adaugare hook/skill/componenta -> Notice detecteaza si anunta corect cand este necesar chat nou
@@ -41,6 +43,8 @@ Documentatie de continuitate si learnings verificate:
   - [x] confirmare `yl-claude-garduri@skills-dir` = loaded
   - [x] confirmare ca setup-ul Cloud Environment este cache-uit si nu este mecanismul potrivit pentru refresh frecvent
   - [x] update complet bazat pe SHA demonstrat in acelasi chat pentru modificarile obisnuite
+  - [x] bootstrap pregatit sa cloneze doar `ci-passed`, nu ultimul `main` netestat
+  - [ ] rebuild environment dupa introducerea gate-ului CI si confirmare runtime
   - [ ] instalare/rebuild dupa separarea folderelor UserPromptSubmit si confirmare runtime
   - [ ] cand introducem prima data hookurile noi (`PreToolUse`, `PostToolUseFailure`, `TaskCompleted`, `Stop` etc.), deschidere sesiune/chat nou pentru activarea lor
   - [ ] dupa confirmare, eliminarea mufei marketplace redundante din `yl/.claude/settings.json`
@@ -49,9 +53,11 @@ Documentatie de continuitate si learnings verificate:
   - [x] baterie runtime anterioara rulata in Claude Code: 5/5 PASS, 0 fail
   - [x] test runtime `deja_la_zi` cu commit GitHub real
   - [x] test runtime `actualizat` dupa schimbare GitHub in acelasi chat
-  - [x] GitHub Actions automat la push pe `main` si PR: `node --check` pentru toate `.mjs` + toate `tests/*.test.mjs`
-  - [x] prima rulare GitHub Actions dupa separarea folderelor: PASS; sintaxa PASS + 5/5 teste PASS
-  - [ ] portarul instaleaza doar commituri pentru care jobul GitHub Actions `teste-garduri` este PASS
+  - [x] GitHub Actions ruleaza automat sintaxa + toate `tests/*.test.mjs` la push/PR
+  - [x] GitHub Actions dupa PASS muta reperul `refs/heads/ci-passed` la commitul testat
+  - [x] test automat pentru logica `main == ci-passed` / `main != ci-passed` / reper lipsa
+  - [x] bateria GitHub Actions dupa separarea folderelor a avut PASS
+  - [ ] test end-to-end al gate-ului CI in Claude Code Web
   - [ ] extindere baterie pe fiecare gard nou
 
 ## Directive transversale
@@ -64,7 +70,8 @@ Documentatie de continuitate si learnings verificate:
 6. Handlerul de intrare UserPromptSubmit si portarul de update sunt bootstrap stabil: nu se autoactualizeaza peste ele insele intr-un update obisnuit.
 7. Portarul verifica si aparitia de hookuri, skills si componente necunoscute, nu doar modificarea fisierelor deja existente.
 8. Pentru Claude Code Web remote nu folosim `/reload-plugins` ca dependenta de arhitectura; cand o componenta structurala noua nu poate fi activata sigur in sesiunea curenta, Notice-ul cere explicit sesiune/chat nou.
-9. Nu transforma un blocaj local intr-un blocaj global: continua cu ce se poate continua, iar cand nu se mai poate fara input, opreste si prezinta contextul, motivul si optiunile.
-10. Nu largi scope-ul tacit in reparatii si nu rezolva tacit conflicte arhitecturale.
+9. Runtime-ul nu instaleaza un `main` nou pana cand `refs/heads/ci-passed` nu indica exact acelasi commit; daca verificarea CI nu poate fi confirmata, update-ul este fail-safe blocat.
+10. Nu transforma un blocaj local intr-un blocaj global: continua cu ce se poate continua, iar cand nu se mai poate fara input, opreste si prezinta contextul, motivul si optiunile.
+11. Nu largi scope-ul tacit in reparatii si nu rezolva tacit conflicte arhitecturale.
 
 Sursa pentru regulile de Notice: `1 Sursa adevar/directiva-generala-claude-notice.txt`.

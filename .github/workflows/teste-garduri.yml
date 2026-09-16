@@ -8,14 +8,13 @@ on:
     branches:
       - main
 
-permissions:
-  contents: read
-
 jobs:
   teste-garduri:
     name: teste-garduri
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repo
@@ -43,3 +42,23 @@ jobs:
             echo "=== $test_file ==="
             node "$test_file"
           done
+
+  marcheaza-ci-pass:
+    name: marcheaza-ci-pass
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: teste-garduri
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout commitul testat
+        uses: actions/checkout@v4
+
+      - name: Muta reperul ci-passed numai dupa PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Toate testele au PASS. Mut refs/heads/ci-passed la ${GITHUB_SHA}."
+          git push --force origin "${GITHUB_SHA}:refs/heads/ci-passed"

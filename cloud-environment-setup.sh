@@ -7,12 +7,13 @@ NEW_PLUGIN="${SKILLS_DIR}/yl-claude-garduri"
 TEMP_PLUGIN="${SKILLS_DIR}/yl-claude-garduri.new"
 DIAGNOSTIC_FILE="${SKILLS_DIR}/YL_SETUP_RULAT.txt"
 REPO_URL="https://github.com/ion-motica/YL-Claude-garduri.git"
+CI_PASSED_BRANCH="ci-passed"
 
 mkdir -p "${SKILLS_DIR}"
 rm -rf "${TEMP_PLUGIN}"
 
-echo "[YL-GUARD setup] clonez versiunea curenta in zona temporara..."
-git clone --depth 1 "${REPO_URL}" "${TEMP_PLUGIN}"
+echo "[YL-GUARD setup] clonez ultima versiune care are CI PASS in zona temporara..."
+git clone --depth 1 --branch "${CI_PASSED_BRANCH}" --single-branch "${REPO_URL}" "${TEMP_PLUGIN}"
 
 # Nu inlocui instalarea existenta pana cand noua copie nu are piesele minime de plugin.
 test -f "${TEMP_PLUGIN}/.claude-plugin/plugin.json"
@@ -41,10 +42,12 @@ INSTALLED_COMMIT="$(git -C "${NEW_PLUGIN}" rev-parse HEAD)"
   echo "setup_rulat_la_utc=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   echo "commit_clonat=${INSTALLED_COMMIT}"
   echo "repo=${REPO_URL}"
+  echo "sursa_instalarii=refs/heads/${CI_PASSED_BRANCH}"
   echo "instalare=${NEW_PLUGIN}"
 } > "${DIAGNOSTIC_FILE}"
 
 echo "[YL-GUARD setup] OK"
+echo "[YL-GUARD setup] commit cu CI PASS: ${INSTALLED_COMMIT}"
 echo "[YL-GUARD setup] nou: ${NEW_PLUGIN}"
 echo "[YL-GUARD setup] vechi eliminat: ${OLD_PLUGIN}"
 echo "[YL-GUARD setup] diagnostic: ${DIAGNOSTIC_FILE}"
