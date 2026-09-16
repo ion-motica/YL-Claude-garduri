@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {
   parseazaDiffNameStatus,
   clasificaSchimbariPlugin,
-} from "../Hook UserPromptSubmit - cand trimit prompt/motor_detectare_hooks_skills_si_componente_noi_la_actualizare.mjs";
+} from "../Hook UserPromptSubmit - cand trimit prompt insereaza reminder/motor_detectare_hooks_skills_si_componente_noi_la_actualizare.mjs";
 
 const raw = [
   "M\t1 Sursa adevar/daca_detecteza_cuvinte_in_prompt_atunci_insereaza_asta.txt",
@@ -31,7 +31,7 @@ const numaiSkillModificat = clasificaSchimbariPlugin(
 assert.equal(numaiSkillModificat.sesiuneNouaNecesara, false);
 
 const numaiCod = clasificaSchimbariPlugin(
-  parseazaDiffNameStatus("M\tHook UserPromptSubmit - cand trimit prompt/motor_alegere_reminder_de_inserat.mjs\n"),
+  parseazaDiffNameStatus("M\tHook UserPromptSubmit - cand trimit prompt insereaza reminder/motor_alegere_reminder_de_inserat.mjs\n"),
 );
 assert.equal(numaiCod.sesiuneNouaNecesara, false);
 
