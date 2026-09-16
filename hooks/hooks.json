@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/Hook UserPromptSubmit - cand trimit prompt/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/Hook UserPromptSubmit - cand trimit prompt insereaza reminder/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs\""
           }
         ]
       }
