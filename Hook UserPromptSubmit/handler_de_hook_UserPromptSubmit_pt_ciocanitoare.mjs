@@ -14,6 +14,11 @@ import {
   readLastAssistantMessage,
   formatInjectedForContext,
 } from "./motor_alegere_reminder_de_inserat.mjs";
+import {
+  sincronizeazaFisiereleSursaAdevarDinGitHub,
+  formatSincronizarePentruNotice,
+  formatSincronizareProblemaPentruContext,
+} from "./program_sincronizare_fisiere_sursa_adevar_din_GitHub_inainte_de_fiecare_prompt.mjs";
 import { formatComponentPresence } from "../shared/claude-notice.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -27,6 +32,7 @@ const VALIDATED_FILES = [FILE_PROTECTIE, FILE_REMINDERE];
 const HOOK_NAME = "UserPromptSubmit";
 const PROGRAM_NAME = "handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs";
 const MOTOR_NAME = "motor_alegere_reminder_de_inserat.mjs";
+const PROGRAM_SINCRONIZARE_NAME = "program_sincronizare_fisiere_sursa_adevar_din_GitHub_inainte_de_fiecare_prompt.mjs";
 const PLUGIN_NAME = "yl-claude-garduri@skills-dir";
 
 function readStdin() {
@@ -83,17 +89,22 @@ function formatErrorAnnouncement(errors) {
   return lines.join("\n");
 }
 
-function formatActiuneHookPentruNotice(selected) {
+function formatActiuneHookPentruNotice(selected, syncResult) {
   const lines = [
     `Hookul "${HOOK_NAME}" a declansat programul nostru "${PROGRAM_NAME}".`,
     `Programul a folosit modulul "${MOTOR_NAME}".`,
+    `Programul a folosit programul "${PROGRAM_SINCRONIZARE_NAME}" pentru a verifica sursa de adevar din GitHub inainte de acest prompt.`,
+    "",
+    formatSincronizarePentruNotice(syncResult),
   ];
 
   if (selected.length === 0) {
+    lines.push("");
     lines.push("Programul nu a injectat niciun reminder_ciocanitoare_injectat_in_prompt.");
     return lines.join("\n");
   }
 
+  lines.push("");
   lines.push("Programul a injectat in prompt:");
   selected.forEach((item, index) => {
     const cauza = item.kind === "toate"
@@ -106,9 +117,6 @@ function formatActiuneHookPentruNotice(selected) {
   return lines.join("\n");
 }
 
-// TEST DE AFISARE:
-// Scoatem TOATE newline-urile doar din systemMessage-ul vizibil si le inlocuim
-// cu un delimitator non-whitespace. Contextul injectat catre Claude ramane neschimbat.
 function noticePeUnSingurRand(text) {
   return String(text).replace(/\s*\r?\n+\s*/g, " | ");
 }
@@ -121,6 +129,9 @@ try {
   input = {};
 }
 
+// IMPORTANT: sincronizarea se face INAINTE de validare si selectie,
+// astfel incat chiar promptul curent sa foloseasca ultima versiune valida din GitHub.
+const syncResult = sincronizeazaFisiereleSursaAdevarDinGitHub({ root: ROOT });
 const allErrors = validateAll();
 let selected = [];
 let reminderFileErrors = [];
@@ -140,13 +151,17 @@ try {
 
 const injectedContext = formatInjectedForContext(selected);
 const displayCuStructuraNormala = [
-  formatActiuneHookPentruNotice(selected),
-  `VALIDARE CONFIGURATIE:\n${formatValidatorForDisplay(allErrors)}`,
+  formatActiuneHookPentruNotice(selected, syncResult),
+  `VALIDARE CONFIGURATIE LOCALA FOLOSITA ACUM:\n${formatValidatorForDisplay(allErrors)}`,
   `PREZENTA COMPONENTEI:\n${formatComponentPresence(PLUGIN_NAME, ROOT)}`,
 ].join("\n\n");
 const display = noticePeUnSingurRand(displayCuStructuraNormala);
 
 const contextParts = [];
+const syncProblemContext = formatSincronizareProblemaPentruContext(syncResult);
+if (syncProblemContext) {
+  contextParts.push(syncProblemContext);
+}
 if (allErrors.length > 0) {
   contextParts.push(formatErrorAnnouncement(allErrors));
 }
