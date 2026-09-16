@@ -17,9 +17,10 @@ git clone --depth 1 "${REPO_URL}" "${TEMP_PLUGIN}"
 # Nu inlocui instalarea existenta pana cand noua copie nu are piesele minime de plugin.
 test -f "${TEMP_PLUGIN}/.claude-plugin/plugin.json"
 test -f "${TEMP_PLUGIN}/hooks/hooks.json"
+test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit/program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs"
 test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit/handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs"
 test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit/motor_alegere_reminder_de_inserat.mjs"
-test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit/program_sincronizare_fisiere_sursa_adevar_din_GitHub_inainte_de_fiecare_prompt.mjs"
+test -f "${TEMP_PLUGIN}/Hook UserPromptSubmit/motor_detectare_hooks_skills_si_componente_noi_la_actualizare.mjs"
 
 echo "[YL-GUARD setup] instalare noua verificata; o activez ca skills-directory plugin..."
 rm -rf "${NEW_PLUGIN}"
