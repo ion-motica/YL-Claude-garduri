@@ -32,12 +32,9 @@ ORGANIZAREA TEXTULUI DIN CLAUDE CODE NOTICE
 
 1. INTAI se afiseaza rezultatul util pentru user, nu detaliile tehnice.
 
-Pentru UserPromptSubmit / ciocanitoare, forma incepe cu:
+Pentru UserPromptSubmit / ciocanitoare, forma incepe compact astfel:
 
-S-a inserat:
-CP=<textul reminderului CP>
-crc=<textul reminderului crc>
-...
+S-a inserat: CP=<textul reminderului CP> ; crc=<textul reminderului crc> ; ...
 
 Se afiseaza numai reminderele care au fost efectiv inserate.
 Daca nu s-a inserat niciun reminder, forma este scurta:
