@@ -178,3 +178,31 @@ Runtime verificat manual in Claude Code Web inainte de separarea pe cele doua fo
 - test `test44` dupa commit nou in GitHub: `actualizat`, schimbare TXT detectata, regula noua folosita in acelasi chat.
 
 Dupa separarea pe `update all garduri` + `insereaza reminder`, bateria si comportamentul end-to-end trebuie rerulate intr-un runtime nou. Pana atunci nu confundam validarea structurii GitHub cu validarea runtime a noii cablari.
+
+## 9. Limbajul pentru utilizator: traduce complet, nu expune jargon intern inutil
+
+Utilizatorul opereaza conceptual sistemul de garduri. Nu trebuie obligat sa invete, sa retina sau sa-si reaminteasca etichete interne doar pentru a intelege ce trebuie sa faca.
+
+Exemplu de anti-pattern:
+
+```text
+rezultat: ci_main_neaprobat
+```
+
+Acesta poate ramane un cod intern util programului si testelor, dar nu este un mesaj bun pentru utilizator.
+
+Daca starea poate fi tradusa 1:1 in limbaj firesc, complet, nereductiv, neconfuz si fara risc de a induce in eroare, Notice-ul trebuie sa afiseze direct acea traducere.
+
+Exemplu bun pentru aceeasi stare:
+
+```text
+EXISTA O VERSIUNE NOUA, DAR TESTELE AUTOMATE INCA NU AU CONFIRMAT-O.
+Pastrez momentan ultima versiune verificata.
+VERIFICA HOOKUL DIN NOU PESTE CATEVA MINUTE.
+```
+
+Regula generala:
+
+> Mesajele vizibile utilizatorului descriu starea, consecinta si actiunea necesara in limbaj firesc. Codurile tehnice interne raman sub capota, exceptand cazurile in care sunt necesare pentru diagnostic, exista o alegere/risc/ambiguitate reala sau utilizatorul cere explicit detaliile tehnice.
+
+Nu simplificam prin ascunderea unei diferente importante. Daca traducerea ar pierde informatie necesara unei decizii corecte, atunci explicam tehnicul. Dar daca traducerea este completa si echivalenta semantic, jargonul intern este doar cost cognitiv si nu trebuie impins in interfata utilizatorului.
