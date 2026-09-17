@@ -144,12 +144,17 @@ function listaScurta(valori, limita = 10) {
 
 function formatActualizarePluginPentruNotice(status) {
   const commit = status?.remoteCommit ? String(status.remoteCommit).slice(0, 12) : "necunoscut";
-  const lines = [
-    "ACTUALIZARE GARDURI DIN GITHUB:",
+  const lines = ["ACTUALIZARE GARDURI DIN GITHUB:"];
+
+  if (status?.status === "ci_main_neaprobat") {
+    lines.push("VERIFICA HOOKUL DIN NOU PESTE CATEVA MINUTE");
+  }
+
+  lines.push(
     `rezultat: ${status?.status || "necunoscut"}`,
     `commit GitHub verificat: ${commit}`,
     status?.mesaj || "fara mesaj",
-  ];
+  );
 
   if (status?.schimbari?.length) {
     const schimbari = status.schimbari.map((x) => `${x.status}:${x.path}`);
