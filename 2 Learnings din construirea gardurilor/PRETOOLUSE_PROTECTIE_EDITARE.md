@@ -27,7 +27,25 @@ Regulile, exceptiile temporare, folderele recursive si exceptia pentru tot repos
 
 Listele sunt generate in director temporar, in afara checkout-ului pluginului, ca sa nu murdareasca repository-ul runtime al gardurilor si sa nu blocheze updaterul GitHub.
 
-Verdictul pentru o modificare este permis numai daca fisierul apare in lista permisa si nu apare in lista interzisa.
+Verdictul pentru o modificare existenta este permis numai daca fisierul apare in lista permisa si nu apare in lista interzisa. Pentru un fisier nou, care prin definitie nu putea exista in lista generata anterior, PreToolUse aplica aceeasi stare efectiva calculata din sursa de adevar fara sa rescrie listele doar pentru acel apel.
+
+## Regenerarea listelor si hashul sursei
+
+La fiecare `UserPromptSubmit` se verifica automat starea listelor DA/NU.
+
+Fiecare lista contine in antet:
+
+- hashul SHA-256 al sursei `blocheazaEditareFisiereSiExceptii.txt`;
+- hashul starii efective de protectie;
+- data si ora la care listele au fost generate, in `Europe/Bucharest`.
+
+Daca hashul sursei si hashul starii efective sunt identice cu cele din listele existente, fisierele DA/NU NU sunt rescrise. Raman exact aceleasi, inclusiv data/ora generarii.
+
+Daca sursa mama se modifica, listele se regenereaza. De asemenea, daca o exceptie temporara expira, starea efectiva se schimba si listele se regenereaza chiar daca textul sursei mama a ramas identic. Acest al doilea hash evita ca o exceptie expirata sa ramana accidental activa doar pentru ca fisierul sursa nu s-a modificat.
+
+Claude primeste la fiecare prompt, in contextul hookului, calea ambelor liste, hashul sursei, data/ora generarii si daca listele au fost regenerate sau au ramas neschimbate.
+
+Listele sunt generate automat si nu trebuie editate manual.
 
 ## Fail closed
 

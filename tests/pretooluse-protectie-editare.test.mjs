@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import os from "node:os";
 import path from "node:path";
 import {
-  genereazaListeEfectiveDeEditare,
+  asiguraListeEfectiveDeEditare,
+  citesteListaGenerata,
   parseazaReguliProtectie,
   verdictPentruCale,
 } from "../Hook PreToolUse - inainte sa modifice Claude un fisier verifica daca e protejat si opreste modificarea/motor_calculeaza_liste_efective_de_fisiere_permise_si_interzise.mjs";
@@ -98,43 +99,76 @@ blocheazaEditareFisiereSiFoldere {
 
 {
   const root = repoTemporar();
-  const rezultat = genereazaListeEfectiveDeEditare({
+  const now1 = new Date("2026-09-17T11:00:00Z");
+  const rezultat1 = asiguraListeEfectiveDeEditare({
     cwd: root,
-    caleCerutaAbsoluta: path.join(root, "js", "liber.js"),
     rawProtectie: RAW_BAZA,
-    sessionId: "liste-baza",
+    sessionId: "liste-hash",
+    now: now1,
   });
-  assert.equal(rezultat.ok, true);
-  assert.equal(rezultat.tinta, "js/liber.js");
-  assert.ok(existsSync(rezultat.fisierPermise));
-  assert.ok(existsSync(rezultat.fisierInterzise));
-  const permise = readFileSync(rezultat.fisierPermise, "utf8");
-  const interzise = readFileSync(rezultat.fisierInterzise, "utf8");
-  assert.match(permise, /^js\/liber\.js$/m);
-  assert.doesNotMatch(permise, /^js\/fix\.js$/m);
-  assert.match(interzise, /^js\/fix\.js$/m);
-  assert.match(interzise, /^js\/protejat\/a\.js$/m);
+  assert.equal(rezultat1.ok, true);
+  assert.equal(rezultat1.statusListe, "regenerate");
+  assert.ok(existsSync(rezultat1.fisierPermise));
+  assert.ok(existsSync(rezultat1.fisierInterzise));
+  const continutPermise1 = readFileSync(rezultat1.fisierPermise, "utf8");
+  const continutInterzise1 = readFileSync(rezultat1.fisierInterzise, "utf8");
+  assert.match(continutPermise1, /^# HASH_SURSA: [0-9a-f]{64}$/m);
+  assert.match(continutPermise1, /^# GENERAT_LA: 2026\.09\.17-14\.00 Europe\/Bucharest$/m);
+  assert.deepEqual(citesteListaGenerata(rezultat1.fisierInterzise).sort(), ["js/fix.js", "js/protejat/a.js"].sort());
+
+  const rezultat2 = asiguraListeEfectiveDeEditare({
+    cwd: root,
+    rawProtectie: RAW_BAZA,
+    sessionId: "liste-hash",
+    now: new Date("2026-09-17T11:05:00Z"),
+  });
+  assert.equal(rezultat2.ok, true);
+  assert.equal(rezultat2.statusListe, "neschimbate");
+  assert.equal(readFileSync(rezultat2.fisierPermise, "utf8"), continutPermise1);
+  assert.equal(readFileSync(rezultat2.fisierInterzise, "utf8"), continutInterzise1);
+
+  const rezultat3 = asiguraListeEfectiveDeEditare({
+    cwd: root,
+    rawProtectie: `${RAW_BAZA}\n// schimbare in sursa mama\n`,
+    sessionId: "liste-hash",
+    now: new Date("2026-09-17T11:06:00Z"),
+  });
+  assert.equal(rezultat3.ok, true);
+  assert.equal(rezultat3.statusListe, "regenerate");
+  assert.notEqual(rezultat3.hashSursa, rezultat1.hashSursa);
+  assert.notEqual(readFileSync(rezultat3.fisierPermise, "utf8"), continutPermise1);
 }
 
 {
   const root = repoTemporar();
-  const rezultatNouLiber = genereazaListeEfectiveDeEditare({
+  const rawCuExceptieCareExpira = `
+blocheazaEditareFisiereSiFoldere {
+  js/fix.js
+}
+permiteEditarePanaLa(2026.09.17-15.00 Europe/Bucharest) {
+  js/fix.js
+}
+`;
+  const inainte = asiguraListeEfectiveDeEditare({
     cwd: root,
-    caleCerutaAbsoluta: path.join(root, "js", "nou.js"),
-    rawProtectie: RAW_BAZA,
-    sessionId: "nou-liber",
+    rawProtectie: rawCuExceptieCareExpira,
+    sessionId: "expirare-exceptie",
+    now: new Date("2026-09-17T11:00:00Z"),
   });
-  assert.equal(rezultatNouLiber.ok, true);
-  assert.ok(rezultatNouLiber.permise.includes("js/nou.js"));
+  assert.equal(inainte.ok, true);
+  assert.ok(inainte.permise.includes("js/fix.js"));
 
-  const rezultatNouProtejat = genereazaListeEfectiveDeEditare({
+  const dupa = asiguraListeEfectiveDeEditare({
     cwd: root,
-    caleCerutaAbsoluta: path.join(root, "js", "protejat", "nou.js"),
-    rawProtectie: RAW_BAZA,
-    sessionId: "nou-protejat",
+    rawProtectie: rawCuExceptieCareExpira,
+    sessionId: "expirare-exceptie",
+    now: new Date("2026-09-17T13:00:00Z"),
   });
-  assert.equal(rezultatNouProtejat.ok, true);
-  assert.ok(rezultatNouProtejat.interzise.includes("js/protejat/nou.js"));
+  assert.equal(dupa.ok, true);
+  assert.equal(dupa.statusListe, "regenerate");
+  assert.equal(dupa.hashSursa, inainte.hashSursa);
+  assert.notEqual(dupa.hashStare, inainte.hashStare);
+  assert.ok(dupa.interzise.includes("js/fix.js"));
 }
 
 {
@@ -170,6 +204,26 @@ blocheazaEditareFisiereSiFoldere {
 
 {
   const root = repoTemporar();
+  const outputNou = proceseazaPreToolUse({
+    session_id: "hook-fisier-nou",
+    cwd: root,
+    tool_name: "Write",
+    tool_input: { file_path: path.join(root, "js", "nou.js") },
+  }, { rawProtectie: RAW_BAZA });
+  assert.equal(outputNou.hookSpecificOutput, undefined);
+  assert.match(outputNou.systemMessage, /js\/nou\.js este permis/);
+
+  const outputNouProtejat = proceseazaPreToolUse({
+    session_id: "hook-fisier-nou-protejat",
+    cwd: root,
+    tool_name: "Write",
+    tool_input: { file_path: path.join(root, "js", "protejat", "nou.js") },
+  }, { rawProtectie: RAW_BAZA });
+  assert.equal(outputNouProtejat.hookSpecificOutput.permissionDecision, "deny");
+}
+
+{
+  const root = repoTemporar();
   const invalid = `blocheazaEditareFisiereSiFoldere {\n  js/fix.js\n`;
   const output = proceseazaPreToolUse({
     session_id: "hook-config-invalid",
@@ -198,4 +252,4 @@ blocheazaEditareFisiereSiFoldere {
   assert.match(output.hookSpecificOutput.permissionDecisionReason, /in afara repository-ului curent/i);
 }
 
-console.log("PRETOOLUSE PROTECTIE EDITARE TEST OK");
+console.log("PRETOOLUSE PROTECTIE EDITARE + LISTE HASH TEST OK");

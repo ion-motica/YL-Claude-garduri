@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { validateProtectie } from "../Hook UserPromptSubmit - cand trimit prompt update all garduri din github/config-validator.mjs";
@@ -67,6 +68,10 @@ export function cheieDataOraBucuresti(now = new Date()) {
       .map((part) => [part.type, part.value]),
   );
   return `${parts.year}.${parts.month}.${parts.day}-${parts.hour}.${parts.minute}`;
+}
+
+function dataOraAfisareBucuresti(now = new Date()) {
+  return `${cheieDataOraBucuresti(now)} Europe/Bucharest`;
 }
 
 function deadlineEsteActiv(deadline, now) {
@@ -145,6 +150,9 @@ export function verdictPentruCale(caleRelativa, config) {
 }
 
 export function gasesteRootRepository(cwd) {
+  if (typeof cwd !== "string" || !cwd.trim()) {
+    throw new Error("hookul nu a furnizat cwd pentru repository");
+  }
   return execFileSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
@@ -159,7 +167,7 @@ function listeazaFisiereRepository(root) {
   return raw.split("\0").filter(Boolean).map((cale) => cale.replace(/\\/g, "/"));
 }
 
-function caleRelativaLaRepository(root, caleAbsoluta) {
+export function caleRelativaLaRepository(root, caleAbsoluta) {
   const relativa = path.relative(root, caleAbsoluta).replace(/\\/g, "/");
   if (!relativa || relativa === ".") throw new Error("calea tinta nu este un fisier din repository");
   if (relativa === ".." || relativa.startsWith("../") || path.isAbsolute(relativa)) {
@@ -173,25 +181,77 @@ function directorListe(sessionId) {
   return path.join(os.tmpdir(), "yl-claude-garduri", id, "permisiuni-editare");
 }
 
-function scrieLista(filePath, valori) {
-  writeFileSync(filePath, valori.length ? `${valori.join("\n")}\n` : "", "utf8");
+function hashText(text) {
+  return createHash("sha256").update(String(text), "utf8").digest("hex");
 }
 
-function stergeListeVechi(dir) {
-  rmSync(path.join(dir, NUME_LISTA_FISIERE_PERMISE), { force: true });
-  rmSync(path.join(dir, NUME_LISTA_FISIERE_INTERZISE), { force: true });
+function serializareRegula(regula) {
+  return `${regula.esteFolder ? "folder" : "fisier"}:${regula.cale}`;
 }
 
-export function genereazaListeEfectiveDeEditare({
+function hashStareEfectiva(config) {
+  const stare = {
+    totRepositoryPermis: Boolean(config.totRepositoryPermis),
+    protejate: config.protejate.map(serializareRegula).sort(),
+    exceptiiActive: config.exceptiiActive.map(serializareRegula).sort(),
+  };
+  return hashText(JSON.stringify(stare));
+}
+
+function citesteMetadateLista(filePath) {
+  if (!existsSync(filePath)) return null;
+  const linii = readFileSync(filePath, "utf8").split(/\r?\n/).slice(0, 12);
+  const meta = {};
+  for (const linie of linii) {
+    const m = linie.match(/^#\s*([A-Z_]+):\s*(.*)$/);
+    if (m) meta[m[1]] = m[2].trim();
+  }
+  return meta;
+}
+
+export function citesteListaGenerata(filePath) {
+  return readFileSync(filePath, "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+}
+
+function scrieLista(filePath, valori, { hashSursa, hashStare, generatedAt }) {
+  const antet = [
+    "# GENERAT_AUTOMAT: NU EDITA MANUAL",
+    "# SURSA: 1 Sursa adevar/blocheazaEditareFisiereSiExceptii.txt",
+    `# HASH_SURSA: ${hashSursa}`,
+    `# HASH_STARE_EFECTIVA: ${hashStare}`,
+    `# GENERAT_LA: ${generatedAt}`,
+    "",
+  ].join("\n");
+  const corp = valori.length ? `${valori.join("\n")}\n` : "";
+  writeFileSync(filePath, `${antet}${corp}`, "utf8");
+}
+
+function listeCurenteSuntValide(fisierPermise, fisierInterzise, hashSursa, hashStare) {
+  const metaPermise = citesteMetadateLista(fisierPermise);
+  const metaInterzise = citesteMetadateLista(fisierInterzise);
+  if (!metaPermise || !metaInterzise) return null;
+  const aceleasi = [metaPermise, metaInterzise].every((meta) => (
+    meta.HASH_SURSA === hashSursa && meta.HASH_STARE_EFECTIVA === hashStare
+  ));
+  if (!aceleasi) return null;
+  return {
+    generatedAt: metaPermise.GENERAT_LA || "necunoscut",
+    permise: citesteListaGenerata(fisierPermise),
+    interzise: citesteListaGenerata(fisierInterzise),
+  };
+}
+
+export function asiguraListeEfectiveDeEditare({
   cwd,
-  caleCerutaAbsoluta,
   rawProtectie,
   sessionId,
   now = new Date(),
 }) {
   const dir = directorListe(sessionId);
   mkdirSync(dir, { recursive: true });
-  stergeListeVechi(dir);
 
   const config = parseazaReguliProtectie(rawProtectie, { now });
   if (!config.ok) {
@@ -200,9 +260,30 @@ export function genereazaListeEfectiveDeEditare({
 
   try {
     const root = gasesteRootRepository(cwd);
-    const tinta = caleRelativaLaRepository(root, caleCerutaAbsoluta);
+    const hashSursa = hashText(rawProtectie);
+    const hashStare = hashStareEfectiva(config);
+    const fisierPermise = path.join(dir, NUME_LISTA_FISIERE_PERMISE);
+    const fisierInterzise = path.join(dir, NUME_LISTA_FISIERE_INTERZISE);
+    const curente = listeCurenteSuntValide(fisierPermise, fisierInterzise, hashSursa, hashStare);
+
+    if (curente) {
+      return {
+        ok: true,
+        statusListe: "neschimbate",
+        root,
+        config,
+        hashSursa,
+        hashStare,
+        generatedAt: curente.generatedAt,
+        permise: curente.permise,
+        interzise: curente.interzise,
+        fisierPermise,
+        fisierInterzise,
+        directorListe: dir,
+      };
+    }
+
     const univers = new Set(listeazaFisiereRepository(root));
-    univers.add(tinta);
     for (const regula of config.protejate) {
       if (!regula.esteFolder) univers.add(regula.cale);
     }
@@ -220,16 +301,19 @@ export function genereazaListeEfectiveDeEditare({
       else interzise.push(cale);
     }
 
-    const fisierPermise = path.join(dir, NUME_LISTA_FISIERE_PERMISE);
-    const fisierInterzise = path.join(dir, NUME_LISTA_FISIERE_INTERZISE);
-    scrieLista(fisierPermise, permise);
-    scrieLista(fisierInterzise, interzise);
+    const generatedAt = dataOraAfisareBucuresti(now);
+    const meta = { hashSursa, hashStare, generatedAt };
+    scrieLista(fisierPermise, permise, meta);
+    scrieLista(fisierInterzise, interzise, meta);
 
     return {
       ok: true,
+      statusListe: "regenerate",
       root,
-      tinta,
       config,
+      hashSursa,
+      hashStare,
+      generatedAt,
       permise,
       interzise,
       fisierPermise,

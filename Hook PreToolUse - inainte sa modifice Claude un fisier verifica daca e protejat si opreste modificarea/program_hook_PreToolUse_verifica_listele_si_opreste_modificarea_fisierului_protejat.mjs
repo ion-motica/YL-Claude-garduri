@@ -3,9 +3,12 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  genereazaListeEfectiveDeEditare,
+  asiguraListeEfectiveDeEditare,
+  caleRelativaLaRepository,
+  citesteListaGenerata,
   NUME_LISTA_FISIERE_INTERZISE,
   NUME_LISTA_FISIERE_PERMISE,
+  verdictPentruCale,
 } from "./motor_calculeaza_liste_efective_de_fisiere_permise_si_interzise.mjs";
 import { formatComponentPresence } from "../shared/claude-notice.mjs";
 
@@ -27,15 +30,6 @@ function citesteStdin() {
   });
 }
 
-function citesteLista(filePath) {
-  return new Set(
-    readFileSync(filePath, "utf8")
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean),
-  );
-}
-
 function listaPentruMesaj(valori, fisierInterzise, limita = 80) {
   const linii = valori.slice(0, limita).map((cale) => `- ${cale}`);
   if (valori.length > limita) {
@@ -51,11 +45,14 @@ function mesajErori(erori) {
     .join(" ; ");
 }
 
-function mesajTehnic({ rezultat, fisierPermise, fisierInterzise }) {
+function mesajTehnic({ rezultat, stareListe, hashSursa, generatedAt, fisierPermise, fisierInterzise }) {
   return [
     "VERIFICARE TEHNICA:",
     `Hook activ: ${NUME_HOOK}`,
     `rezultat: ${rezultat}`,
+    stareListe ? `liste efective: ${stareListe}` : "",
+    hashSursa ? `hash sursa reguli: ${hashSursa.slice(0, 16)}` : "",
+    generatedAt ? `liste generate la: ${generatedAt}` : "",
     fisierPermise ? `${NUME_LISTA_FISIERE_PERMISE}: ${fisierPermise}` : "",
     fisierInterzise ? `${NUME_LISTA_FISIERE_INTERZISE}: ${fisierInterzise}` : "",
     `Program hook: ${NUME_PROGRAM}`,
@@ -133,9 +130,8 @@ export function proceseazaPreToolUse(input, {
     }
   }
 
-  const rezultat = genereazaListeEfectiveDeEditare({
+  const rezultat = asiguraListeEfectiveDeEditare({
     cwd: input.cwd,
-    caleCerutaAbsoluta: caleAbsoluta,
     rawProtectie: continutProtectie,
     sessionId: input.session_id,
     now,
@@ -159,17 +155,53 @@ export function proceseazaPreToolUse(input, {
     });
   }
 
-  const permise = citesteLista(rezultat.fisierPermise);
-  const interzise = citesteLista(rezultat.fisierInterzise);
-  const estePermis = permise.has(rezultat.tinta);
-  const esteInterzis = interzise.has(rezultat.tinta);
+  let tinta;
+  try {
+    tinta = caleRelativaLaRepository(rezultat.root, caleAbsoluta);
+  } catch (error) {
+    const reason = [
+      "Nu pot verifica sigur aceasta cale fata de repository.",
+      `Problema concreta: ${error.message}`,
+      "Din siguranta, nu modifica fisierul prin acest apel.",
+    ].join("\n");
+    return outputDeny({
+      systemMessage: [
+        `NU AM MODIFICAT ${caleAbsoluta}. ${error.message}.`,
+        mesajTehnic({
+          rezultat: "modificare oprita deoarece tinta nu poate fi raportata sigur la repository",
+          stareListe: rezultat.statusListe,
+          hashSursa: rezultat.hashSursa,
+          generatedAt: rezultat.generatedAt,
+          fisierPermise: rezultat.fisierPermise,
+          fisierInterzise: rezultat.fisierInterzise,
+        }),
+      ].join("\n\n"),
+      reason,
+    });
+  }
+
+  const permise = new Set(citesteListaGenerata(rezultat.fisierPermise));
+  const interzise = new Set(citesteListaGenerata(rezultat.fisierInterzise));
+  let estePermis = permise.has(tinta);
+  let esteInterzis = interzise.has(tinta);
+
+  // Un fisier nou nu exista inca in listele generate la prompt. In acest caz
+  // aplicam verdictul aceleiasi configuratii efective, fara sa rescriem listele.
+  if (!estePermis && !esteInterzis) {
+    const verdict = verdictPentruCale(tinta, rezultat.config);
+    estePermis = verdict === "permis";
+    esteInterzis = verdict === "interzis";
+  }
 
   if (estePermis && !esteInterzis) {
     return {
       systemMessage: [
-        `VERIFICARE PROTECTIE EDITARE: ${rezultat.tinta} este permis pentru modificare de listele efective curente.`,
+        `VERIFICARE PROTECTIE EDITARE: ${tinta} este permis pentru modificare de starea efectiva curenta.`,
         mesajTehnic({
           rezultat: "modificarea acestui fisier este permisa",
+          stareListe: rezultat.statusListe,
+          hashSursa: rezultat.hashSursa,
+          generatedAt: rezultat.generatedAt,
           fisierPermise: rezultat.fisierPermise,
           fisierInterzise: rezultat.fisierInterzise,
         }),
@@ -178,16 +210,19 @@ export function proceseazaPreToolUse(input, {
   }
 
   const reason = mesajPentruClaudeCandFisierulEsteInterzis({
-    tinta: rezultat.tinta,
+    tinta,
     interzise: [...interzise],
     fisierInterzise: rezultat.fisierInterzise,
   });
   return outputDeny({
     systemMessage: [
-      `NU AM MODIFICAT ${rezultat.tinta}. Fisierul este in lista actuala de fisiere interzise.`,
+      `NU AM MODIFICAT ${tinta}. Fisierul este interzis de protectiile efective curente.`,
       "Claude trebuie sa caute mai intai o cale fezabila si necomplicata care respecta protectia. Daca ramane necesara o decizie, trebuie sa continue intai subtaskurile independente si apoi sa-ti prezinte grupat ce are nevoie sa decizi.",
       mesajTehnic({
         rezultat: "modificarea acestui fisier a fost oprita",
+        stareListe: rezultat.statusListe,
+        hashSursa: rezultat.hashSursa,
+        generatedAt: rezultat.generatedAt,
         fisierPermise: rezultat.fisierPermise,
         fisierInterzise: rezultat.fisierInterzise,
       }),

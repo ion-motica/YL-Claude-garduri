@@ -14,6 +14,7 @@ import {
   readLastAssistantMessage,
   formatInjectedForContext,
 } from "./motor_alegere_reminder_de_inserat.mjs";
+import { asiguraListeEfectiveDeEditare } from "../Hook PreToolUse - inainte sa modifice Claude un fisier verifica daca e protejat si opreste modificarea/motor_calculeaza_liste_efective_de_fisiere_permise_si_interzise.mjs";
 import { formatComponentPresence } from "../shared/claude-notice.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +22,7 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, "..");
 const SOURCE_DIR = path.join(ROOT, "1 Sursa adevar");
 const REMINDERS_PATH = path.join(SOURCE_DIR, FILE_REMINDERE);
+const PROTECTIE_PATH = path.join(SOURCE_DIR, FILE_PROTECTIE);
 const REPO_NAME = "YL-Claude-garduri";
 const SOURCE_RELATIVE_DIR = "1 Sursa adevar";
 const VALIDATED_FILES = [FILE_PROTECTIE, FILE_REMINDERE];
@@ -147,11 +149,13 @@ function formatActualizarePluginPentruNotice(status) {
   const lines = ["ACTUALIZARE GARDURI DIN GITHUB:"];
 
   if (status?.status === "ci_main_neaprobat") {
+    lines.push("EXISTA O VERSIUNE NOUA, DAR TESTELE AUTOMATE INCA NU AU CONFIRMAT-O. Pastrez momentan ultima versiune verificata.");
     lines.push("VERIFICA HOOKUL DIN NOU PESTE CATEVA MINUTE");
+  } else {
+    lines.push(`rezultat: ${status?.status || "necunoscut"}`);
   }
 
   lines.push(
-    `rezultat: ${status?.status || "necunoscut"}`,
     `commit GitHub verificat: ${commit}`,
     status?.mesaj || "fara mesaj",
   );
@@ -173,10 +177,65 @@ function formatActualizarePluginPentruNotice(status) {
   return lines.join("\n");
 }
 
-function formatVerificareTehnicaPentruNotice(statusActualizare, allErrors) {
+function pregatesteListeEditare(input) {
+  try {
+    const rawProtectie = readFileSync(PROTECTIE_PATH, "utf8");
+    return asiguraListeEfectiveDeEditare({
+      cwd: input?.cwd,
+      rawProtectie,
+      sessionId: input?.session_id,
+      now: new Date(),
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      tip: "nu_pot_pregati_listele",
+      erori: [{ file: FILE_PROTECTIE, line: 1, message: error.message }],
+    };
+  }
+}
+
+function formatListeEditarePentruNotice(statusListe) {
+  if (!statusListe?.ok) {
+    const problema = statusListe?.erori?.[0]?.message || "problema necunoscuta";
+    return `LISTE EFECTIVE DE EDITARE: nu au putut fi verificate/generate. Problema: ${problema}`;
+  }
+  const stare = statusListe.statusListe === "regenerate"
+    ? "regenerate acum deoarece starea efectiva s-a schimbat"
+    : "neschimbate; hashul sursei si starea efectiva sunt aceleasi";
+  return [
+    `LISTE EFECTIVE DE EDITARE: ${stare}`,
+    `hash sursa: ${statusListe.hashSursa.slice(0, 16)}`,
+    `generate la: ${statusListe.generatedAt}`,
+    `PERMISE: ${statusListe.fisierPermise}`,
+    `INTERZISE: ${statusListe.fisierInterzise}`,
+  ].join("\n");
+}
+
+function contextListeEditarePentruClaude(statusListe) {
+  if (!statusListe?.ok) {
+    const problema = statusListe?.erori?.[0]?.message || "problema necunoscuta";
+    return [
+      "LISTELE EFECTIVE DE EDITARE NU POT FI VERIFICATE SIGUR.",
+      `Problema: ${problema}`,
+      "Nu presupune permisiunile de editare. PreToolUse trebuie sa ramana fail-closed pentru modificarile pe care nu le poate verifica sigur.",
+    ].join("\n");
+  }
+  const stare = statusListe.statusListe === "regenerate" ? "regenerate la acest prompt" : "neschimbate de la generarea anterioara";
+  return [
+    `LISTE EFECTIVE DE EDITARE: ${stare}.`,
+    `HASH SURSA: ${statusListe.hashSursa}`,
+    `GENERATE LA: ${statusListe.generatedAt}`,
+    `FISIERE PERMISE: ${statusListe.fisierPermise}`,
+    `FISIERE INTERZISE: ${statusListe.fisierInterzise}`,
+  ].join("\n");
+}
+
+function formatVerificareTehnicaPentruNotice(statusActualizare, allErrors, statusListe) {
   return [
     "VERIFICARE TEHNICA:",
     formatActualizarePluginPentruNotice(statusActualizare),
+    formatListeEditarePentruNotice(statusListe),
     `VALIDARE CONFIGURATIE LOCALA FOLOSITA ACUM:\n${formatValidatorForDisplay(allErrors)}`,
     `Hook activ: ${HOOK_NAME}`,
     `Portar actualizare: ${PORTAR_NAME}`,
@@ -200,6 +259,7 @@ try {
 
 const statusActualizare = citesteStatusActualizarePlugin();
 const allErrors = validateAll();
+const statusListe = pregatesteListeEditare(input);
 let selected = [];
 let reminderFileErrors = [];
 
@@ -219,11 +279,11 @@ try {
 const injectedContext = formatInjectedForContext(selected);
 const displayCuStructuraNormala = [
   formatInserariPentruNotice(selected),
-  formatVerificareTehnicaPentruNotice(statusActualizare, allErrors),
+  formatVerificareTehnicaPentruNotice(statusActualizare, allErrors, statusListe),
 ].join("\n\n");
 const display = noticePeUnSingurRand(displayCuStructuraNormala);
 
-const contextParts = [];
+const contextParts = [contextListeEditarePentruClaude(statusListe)];
 if (statusActualizare?.reloadNecesar) {
   contextParts.push([
     "ANUNTA UTILIZATORUL CA:",
