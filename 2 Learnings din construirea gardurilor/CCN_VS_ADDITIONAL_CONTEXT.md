@@ -2,56 +2,96 @@
 
 ## Diferenta esentiala
 
-Pentru hookurile sincrone pe care le folosim acum, in special `UserPromptSubmit`:
+Pentru hookurile sincrone folosite acum, in special `UserPromptSubmit` si `PreToolUse`:
 
-- `systemMessage` = mesaj pentru utilizator; apare ca Claude Code Notice / avertizare vizibila. Nu este introdus in contextul lui Claude doar pentru ca apare in Notice.
-- `hookSpecificOutput.additionalContext` = text introdus in contextul lui Claude ca system reminder. Claude il citeste la urmatorul model request, dar textul nu apare ca mesaj in interfata / CCN.
+- `systemMessage` = mesaj vizibil utilizatorului in Claude Code Notice. Pentru aceste hookuri sincrone, simplul fapt ca textul apare in CCN nu il introduce in contextul lui Claude.
+- `hookSpecificOutput.additionalContext` = text introdus in contextul lui Claude ca system reminder. Claude il citeste, dar textul nu apare ca mesaj normal in interfata.
+- la `PreToolUse` cu `permissionDecision: "deny"`, `permissionDecisionReason` este transmis lui Claude ca motiv al blocarii.
 
 Pe scurt:
 
 ```text
-CCN / systemMessage = vede omul
-additionalContext   = primeste Claude
+CCN / systemMessage       = vede omul
+additionalContext         = primeste Claude
+permissionDecisionReason  = primeste Claude dupa deny
 ```
 
-Ambele sunt controlate explicit de programul hookului: codul nostru decide daca le emite si ce text contin.
+Programul hookului controleaza explicit aceste iesiri.
 
-## Ce il influenteaza pe Claude
+## Important: regula nu este universala pentru toate evenimentele
 
-In `UserPromptSubmit` sincron, continutul din CCN (`systemMessage`) este pentru utilizator. Pentru a transmite informatie/instructiuni lui Claude folosim `additionalContext`.
-
-La `PreToolUse`, daca hookul blocheaza un tool, `permissionDecisionReason` este transmis lui Claude ca motiv al blocarii; acesta este un alt canal care poate influenta comportamentul lui Claude dupa deny.
-
-## Exceptii importante: nu generaliza mecanic
-
-Comportamentul `systemMessage` este dependent de eveniment si de modul de rulare. Documentatia Anthropic precizeaza exceptii, de exemplu:
-
+Documentatia Anthropic are exceptii:
 - unele evenimente ignora `systemMessage`;
-- unele evenimente il livreaza diferit;
-- pentru hookuri async, dupa terminare, atat `additionalContext`, cat si `systemMessage` pot fi livrate lui Claude la urmatorul turn, iar niciunul nu este afisat utilizatorului.
+- unele il livreaza diferit;
+- la hookuri async, `systemMessage` si `additionalContext` pot ajunge la Claude ulterior, fara afisare utilizatorului.
 
-De aceea, pentru fiecare hook nou trebuie verificata schema exacta a evenimentului, nu presupusa o regula universala.
+De aceea fiecare eveniment nou se verifica separat in documentatia curenta.
 
-## Learning din testul PreToolUse
+## Learning din primul test live PreToolUse
 
-Primul test live PreToolUse a fost contaminat: `UserPromptSubmit` a injectat in `additionalContext` existenta si caile listelor `PERMISE` / `INTERZISE` inainte ca Claude sa incerce primul `Edit`. Claude a consultat singur listele si s-a oprit inainte ca `PreToolUse` sa fie testat pe fisierul interzis.
+Primul test a fost contaminat: `UserPromptSubmit` injecta in `additionalContext`
+existenta si caile listelor `PERMISE` / `INTERZISE` inainte ca Claude sa incerce primul `Edit`.
+Claude a citit listele si s-a oprit singur, deci primul fisier interzis nu a ajuns sa testeze efectiv `PreToolUse`.
 
-Consecinta: pentru un test curat al PreToolUse, Claude nu trebuie informat inainte de primul `Edit` despre listele de protectie. UserPromptSubmit poate continua sa genereze/verifice listele intern, dar primul semnal catre Claude despre blocare trebuie sa vina din PreToolUse.
+Corectia:
+- UserPromptSubmit continua sa genereze/verifice listele intern;
+- listele de protectie nu mai sunt injectate preventiv in `additionalContext`;
+- primul semnal de blocare poate veni din `PreToolUse`.
 
-## Regula de observabilitate de analizat / stabilit
+## Regula stabilita: CCN scurt, audit complet in log
 
-Trebuie sa definim explicit politica dintre cele doua canale:
+CCN nu mai este panou de debug.
 
-- ce informatie poate exista doar in CCN;
-- ce informatie poate intra in `additionalContext`;
-- daca orice informatie/instructiune trimisa lui Claude prin `additionalContext` trebuie sa aiba obligatoriu un echivalent vizibil pentru utilizator in CCN;
-- cum tratam exceptiile de test in care vrem intentionat zero informatie pentru Claude inaintea unui anumit hook.
+Forma tinta:
 
-Pana la stabilirea regulii finale, nu presupunem ca "ce vede utilizatorul in CCN" este identic cu "ce a primit Claude".
+```text
+<nume folder hook in repo> a facut X.
+```
+
+Detaliile complete merg in fisierul runtime:
+
+```text
+/tmp/yl-claude-garduri/log activitate hooks.txt
+```
+
+Fisierul este intentionat in afara checkout-ului pluginului, ca hookurile sa poata scrie
+in el fara sa faca repository-ul runtime "dirty" si fara sa blocheze updaterul GitHub.
+
+Fiecare intrare din log trebuie sa contina:
+- data/ora si sesiunea;
+- hookul/folderul;
+- ce a facut;
+- textul exact CCN;
+- textul exact `additionalContext`;
+- alte mesaje catre Claude, inclusiv `permissionDecisionReason`;
+- alte activitati tehnice relevante.
+
+In log se pastreaza newline-uri normale; nu se compacteaza totul cu ` | `.
+
+## Regula de audit
+
+Nu mai acceptam un canal model-facing invizibil si neauditat.
+
+Daca un program de hook trimite text lui Claude prin `additionalContext`,
+`permissionDecisionReason` sau alt canal suportat de eveniment, acel text trebuie
+sa fie inregistrat in `log activitate hooks.txt`.
+
+CCN poate ramane foarte scurt tocmai pentru ca detaliul complet este disponibil in log.
+
+## TODO ramas
+
+Trebuie verificat explicit, per fiecare hook/eveniment nou:
+- ce campuri ajung la user;
+- ce campuri ajung la Claude;
+- ce campuri sunt ignorate;
+- diferentele pentru hookuri async.
+
+Nu presupunem mecanic aceeasi semantica pentru toate evenimentele.
 
 ## Sursa verificata
 
-Anthropic Claude Code hooks reference:
-- `systemMessage`: mesaj de avertizare pentru utilizator in schema JSON generala, cu exceptii per eveniment;
-- `additionalContext`: text introdus in contextul lui Claude ca system reminder, fara mesaj vizibil in interfata;
-- comportamentul exact trebuie verificat per eveniment.
+Anthropic Claude Code Hooks Reference:
+- `systemMessage`: warning/message pentru utilizator in schema generala, cu exceptii per eveniment;
+- `additionalContext`: text introdus in contextul lui Claude;
+- `permissionDecisionReason` la `PreToolUse deny`: motivul este aratat lui Claude;
+- comportamentul exact poate diferi per eveniment si mod sync/async.

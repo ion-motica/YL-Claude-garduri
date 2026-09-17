@@ -6,20 +6,18 @@ import {
   asiguraListeEfectiveDeEditare,
   caleRelativaLaRepository,
   citesteListaGenerata,
-  NUME_LISTA_FISIERE_INTERZISE,
-  NUME_LISTA_FISIERE_PERMISE,
   verdictPentruCale,
 } from "./motor_calculeaza_liste_efective_de_fisiere_permise_si_interzise.mjs";
-import { formatComponentPresence } from "../shared/claude-notice.mjs";
+import {
+  CALE_LOG_ACTIVITATE_HOOKS,
+  scrieLogActivitateHook,
+} from "../shared/program_scrie_log_activitate_hooks.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, "..");
 const SURSA_PROTECTIE = path.join(ROOT, "1 Sursa adevar", "blocheazaEditareFisiereSiExceptii.txt");
-const NUME_HOOK = "PreToolUse";
-const NUME_PROGRAM = "program_hook_PreToolUse_verifica_listele_si_opreste_modificarea_fisierului_protejat.mjs";
-const NUME_MOTOR = "motor_calculeaza_liste_efective_de_fisiere_permise_si_interzise.mjs";
-const NUME_COMPONENTA = "yl-claude-garduri@skills-dir";
+const FOLDER_HOOK = "Hook PreToolUse - inainte sa modifice Claude un fisier verifica daca e protejat si opreste modificarea";
 
 function citesteStdin() {
   return new Promise((resolve) => {
@@ -45,23 +43,6 @@ function mesajErori(erori) {
     .join(" ; ");
 }
 
-function mesajTehnic({ rezultat, stareListe, hashSursa, generatedAt, fisierPermise, fisierInterzise }) {
-  return [
-    "VERIFICARE TEHNICA:",
-    `Hook activ: ${NUME_HOOK}`,
-    `rezultat: ${rezultat}`,
-    stareListe ? `liste efective: ${stareListe}` : "",
-    hashSursa ? `hash sursa reguli: ${hashSursa.slice(0, 16)}` : "",
-    generatedAt ? `liste generate la: ${generatedAt}` : "",
-    fisierPermise ? `${NUME_LISTA_FISIERE_PERMISE}: ${fisierPermise}` : "",
-    fisierInterzise ? `${NUME_LISTA_FISIERE_INTERZISE}: ${fisierInterzise}` : "",
-    `Program hook: ${NUME_PROGRAM}`,
-    `Motor liste: ${NUME_MOTOR}`,
-    "PREZENTA COMPONENTEI:",
-    formatComponentPresence(NUME_COMPONENTA, ROOT),
-  ].filter(Boolean).join("\n");
-}
-
 function mesajPentruClaudeCandFisierulEsteInterzis({ tinta, interzise, fisierInterzise }) {
   return [
     "In plan ai convenit sa nu modifici acest fisier.",
@@ -77,6 +58,10 @@ function mesajPentruClaudeCandFisierulEsteInterzis({ tinta, interzise, fisierInt
     "Grupeaza deciziile care trebuie luate de utilizator; nu transforma un blocaj local intr-un blocaj global.",
     "Cand nu mai poti continua fara decizia utilizatorului, spune-i vizibil, in limbaj firesc: ce subtask nu poate continua, ce fisier/functie protejata ar trebui modificata si motivul concret.",
   ].join("\n");
+}
+
+function ccnScurt(actiune) {
+  return `${FOLDER_HOOK} a facut ${actiune}.`;
 }
 
 function outputDeny({ systemMessage, reason }) {
@@ -102,10 +87,7 @@ export function proceseazaPreToolUse(input, {
   if (typeof caleAbsoluta !== "string" || !caleAbsoluta) {
     const reason = "Nu pot verifica sigur protectia deoarece tool-ul nu a furnizat file_path. Din siguranta, nu modifica fisierul prin acest apel.";
     return outputDeny({
-      systemMessage: [
-        "NU AM PERMIS MODIFICAREA: nu am primit calea fisierului si nu pot verifica sigur protectiile.",
-        mesajTehnic({ rezultat: "modificare oprita deoarece lipseste calea fisierului" }),
-      ].join("\n\n"),
+      systemMessage: ccnScurt("verificarea si a blocat modificarea deoarece calea fisierului lipseste"),
       reason,
     });
   }
@@ -121,10 +103,7 @@ export function proceseazaPreToolUse(input, {
         "Din siguranta, nu modifica fisierul prin acest apel. Continua cu subtaskurile independente si cere decizia utilizatorului numai daca acest blocaj ramane necesar.",
       ].join("\n");
       return outputDeny({
-        systemMessage: [
-          `NU AM MODIFICAT ${caleAbsoluta}. Nu pot verifica sigur regulile de protectie deoarece fisierul de reguli nu poate fi citit.`,
-          mesajTehnic({ rezultat: "modificare oprita deoarece regulile de protectie nu pot fi citite" }),
-        ].join("\n\n"),
+        systemMessage: ccnScurt("verificarea si a blocat modificarea deoarece regulile de protectie nu pot fi citite"),
         reason,
       });
     }
@@ -146,11 +125,7 @@ export function proceseazaPreToolUse(input, {
       "Continua cu subtaskurile independente. Daca taskul chiar depinde de aceasta modificare, explica utilizatorului ce trebuie decis si de ce.",
     ].join("\n");
     return outputDeny({
-      systemMessage: [
-        `NU AM MODIFICAT ${caleAbsoluta}. Nu pot verifica sigur protectiile: ${problema || "configuratia nu poate fi interpretata sigur"}.`,
-        "Am oprit doar aceasta modificare.",
-        mesajTehnic({ rezultat: "modificare oprita deoarece protectiile nu pot fi verificate" }),
-      ].join("\n\n"),
+      systemMessage: ccnScurt("verificarea si a blocat modificarea deoarece protectiile nu pot fi verificate"),
       reason,
     });
   }
@@ -165,17 +140,7 @@ export function proceseazaPreToolUse(input, {
       "Din siguranta, nu modifica fisierul prin acest apel.",
     ].join("\n");
     return outputDeny({
-      systemMessage: [
-        `NU AM MODIFICAT ${caleAbsoluta}. ${error.message}.`,
-        mesajTehnic({
-          rezultat: "modificare oprita deoarece tinta nu poate fi raportata sigur la repository",
-          stareListe: rezultat.statusListe,
-          hashSursa: rezultat.hashSursa,
-          generatedAt: rezultat.generatedAt,
-          fisierPermise: rezultat.fisierPermise,
-          fisierInterzise: rezultat.fisierInterzise,
-        }),
-      ].join("\n\n"),
+      systemMessage: ccnScurt("verificarea si a blocat modificarea deoarece tinta nu poate fi raportata sigur la repository"),
       reason,
     });
   }
@@ -185,8 +150,6 @@ export function proceseazaPreToolUse(input, {
   let estePermis = permise.has(tinta);
   let esteInterzis = interzise.has(tinta);
 
-  // Un fisier nou nu exista inca in listele generate la prompt. In acest caz
-  // aplicam verdictul aceleiasi configuratii efective, fara sa rescriem listele.
   if (!estePermis && !esteInterzis) {
     const verdict = verdictPentruCale(tinta, rezultat.config);
     estePermis = verdict === "permis";
@@ -195,17 +158,7 @@ export function proceseazaPreToolUse(input, {
 
   if (estePermis && !esteInterzis) {
     return {
-      systemMessage: [
-        `VERIFICARE PROTECTIE EDITARE: ${tinta} este permis pentru modificare de starea efectiva curenta.`,
-        mesajTehnic({
-          rezultat: "modificarea acestui fisier este permisa",
-          stareListe: rezultat.statusListe,
-          hashSursa: rezultat.hashSursa,
-          generatedAt: rezultat.generatedAt,
-          fisierPermise: rezultat.fisierPermise,
-          fisierInterzise: rezultat.fisierInterzise,
-        }),
-      ].join("\n\n"),
+      systemMessage: ccnScurt(`verificarea si a permis modificarea ${tinta}`),
     };
   }
 
@@ -215,18 +168,7 @@ export function proceseazaPreToolUse(input, {
     fisierInterzise: rezultat.fisierInterzise,
   });
   return outputDeny({
-    systemMessage: [
-      `NU AM MODIFICAT ${tinta}. Fisierul este interzis de protectiile efective curente.`,
-      "Claude trebuie sa caute mai intai o cale fezabila si necomplicata care respecta protectia. Daca ramane necesara o decizie, trebuie sa continue intai subtaskurile independente si apoi sa-ti prezinte grupat ce are nevoie sa decizi.",
-      mesajTehnic({
-        rezultat: "modificarea acestui fisier a fost oprita",
-        stareListe: rezultat.statusListe,
-        hashSursa: rezultat.hashSursa,
-        generatedAt: rezultat.generatedAt,
-        fisierPermise: rezultat.fisierPermise,
-        fisierInterzise: rezultat.fisierInterzise,
-      }),
-    ].join("\n\n"),
+    systemMessage: ccnScurt(`verificarea si a blocat modificarea ${tinta}`),
     reason,
   });
 }
@@ -239,8 +181,36 @@ async function main() {
   } catch {
     input = {};
   }
+
   const output = proceseazaPreToolUse(input);
+  const target = input?.tool_input?.file_path || "(cale lipsa)";
+  const decision = output?.hookSpecificOutput?.permissionDecision || "fara deny";
+  const reason = output?.hookSpecificOutput?.permissionDecisionReason || "";
+  const additionalContext = output?.hookSpecificOutput?.additionalContext || "";
+
   if (Object.keys(output).length > 0) {
+    try {
+      scrieLogActivitateHook({
+        sessionId: input?.session_id,
+        hookEvent: "PreToolUse",
+        folderHookRepo: FOLDER_HOOK,
+        activitate: decision === "deny"
+          ? `a blocat apelul ${input?.tool_name || "tool"} pentru ${target}`
+          : `a permis continuarea apelului ${input?.tool_name || "tool"} pentru ${target}`,
+        ccn: output.systemMessage || "",
+        additionalContext,
+        alteMesajeCatreClaude: reason,
+        alteActivitati: [
+          `tool_name: ${input?.tool_name || "(lipsa)"}`,
+          `file_path: ${target}`,
+          `permissionDecision: ${decision}`,
+          `runtime plugin root: ${ROOT}`,
+        ].join("\n"),
+      });
+    } catch (error) {
+      output.systemMessage = `${output.systemMessage || ccnScurt("verificarea")} | ${FOLDER_HOOK} nu a putut scrie ${path.basename(CALE_LOG_ACTIVITATE_HOOKS)}.`;
+    }
+
     process.stdout.write(`${JSON.stringify(output)}\n`);
   }
 }

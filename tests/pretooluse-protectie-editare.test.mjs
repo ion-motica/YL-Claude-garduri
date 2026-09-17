@@ -181,7 +181,7 @@ permiteEditarePanaLa(2026.09.17-15.00 Europe/Bucharest) {
   }, { rawProtectie: RAW_BAZA });
 
   assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
-  assert.match(output.systemMessage, /NU AM MODIFICAT js\/fix\.js/);
+  assert.match(output.systemMessage, /a facut verificarea si a blocat modificarea js\/fix\.js/);
   assert.match(output.hookSpecificOutput.permissionDecisionReason, /In plan ai convenit sa nu modifici acest fisier/);
   assert.match(output.hookSpecificOutput.permissionDecisionReason, /js\/fix\.js/);
   assert.match(output.hookSpecificOutput.permissionDecisionReason, /continua cu alte subtaskuri/i);
@@ -198,8 +198,7 @@ permiteEditarePanaLa(2026.09.17-15.00 Europe/Bucharest) {
   }, { rawProtectie: RAW_BAZA });
 
   assert.equal(output.hookSpecificOutput, undefined);
-  assert.match(output.systemMessage, /js\/liber\.js este permis/);
-  assert.match(output.systemMessage, /functioneaza aici/);
+  assert.match(output.systemMessage, /a facut verificarea si a permis modificarea js\/liber\.js/);
 }
 
 {
@@ -211,7 +210,7 @@ permiteEditarePanaLa(2026.09.17-15.00 Europe/Bucharest) {
     tool_input: { file_path: path.join(root, "js", "nou.js") },
   }, { rawProtectie: RAW_BAZA });
   assert.equal(outputNou.hookSpecificOutput, undefined);
-  assert.match(outputNou.systemMessage, /js\/nou\.js este permis/);
+  assert.match(outputNou.systemMessage, /a facut verificarea si a permis modificarea js\/nou\.js/);
 
   const outputNouProtejat = proceseazaPreToolUse({
     session_id: "hook-fisier-nou-protejat",
@@ -233,7 +232,7 @@ permiteEditarePanaLa(2026.09.17-15.00 Europe/Bucharest) {
   }, { rawProtectie: invalid });
 
   assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
-  assert.match(output.systemMessage, /Nu pot verifica sigur protectiile/);
+  assert.match(output.systemMessage, /a facut verificarea si a blocat modificarea deoarece protectiile nu pot fi verificate/);
   assert.match(output.hookSpecificOutput.permissionDecisionReason, /nu ocoli protectia/i);
 }
 
@@ -248,8 +247,8 @@ permiteEditarePanaLa(2026.09.17-15.00 Europe/Bucharest) {
   }, { rawProtectie: RAW_BAZA });
 
   assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
-  assert.match(output.systemMessage, /NU AM MODIFICAT/);
+  assert.match(output.systemMessage, /a facut verificarea si a blocat modificarea deoarece tinta nu poate fi raportata sigur la repository/);
   assert.match(output.hookSpecificOutput.permissionDecisionReason, /in afara repository-ului curent/i);
 }
 
-console.log("PRETOOLUSE PROTECTIE EDITARE + LISTE HASH TEST OK");
+console.log("PRETOOLUSE PROTECTIE EDITARE + LISTE HASH + CCN SCURT TEST OK");

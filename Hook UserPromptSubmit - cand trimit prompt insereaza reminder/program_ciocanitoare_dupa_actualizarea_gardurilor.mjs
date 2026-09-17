@@ -15,7 +15,10 @@ import {
   formatInjectedForContext,
 } from "./motor_alegere_reminder_de_inserat.mjs";
 import { asiguraListeEfectiveDeEditare } from "../Hook PreToolUse - inainte sa modifice Claude un fisier verifica daca e protejat si opreste modificarea/motor_calculeaza_liste_efective_de_fisiere_permise_si_interzise.mjs";
-import { formatComponentPresence } from "../shared/claude-notice.mjs";
+import {
+  CALE_LOG_ACTIVITATE_HOOKS,
+  scrieLogActivitateHook,
+} from "../shared/program_scrie_log_activitate_hooks.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,12 +29,9 @@ const PROTECTIE_PATH = path.join(SOURCE_DIR, FILE_PROTECTIE);
 const REPO_NAME = "YL-Claude-garduri";
 const SOURCE_RELATIVE_DIR = "1 Sursa adevar";
 const VALIDATED_FILES = [FILE_PROTECTIE, FILE_REMINDERE];
-const HOOK_NAME = "UserPromptSubmit";
-const PROGRAM_NAME = "handler_de_hook_UserPromptSubmit_pt_ciocanitoare.mjs";
-const MOTOR_NAME = "motor_alegere_reminder_de_inserat.mjs";
-const PORTAR_NAME = "program_portar_actualizare_intreg_plugin_din_GitHub_inainte_de_fiecare_prompt.mjs";
-const PLUGIN_NAME = "yl-claude-garduri@skills-dir";
 const STATUS_ENV = "YL_GARDURI_STATUS_ACTUALIZARE_PLUGIN";
+const FOLDER_UPDATE = "Hook UserPromptSubmit - cand trimit prompt update all garduri din github";
+const FOLDER_REMINDER = "Hook UserPromptSubmit - cand trimit prompt insereaza reminder";
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -50,20 +50,17 @@ function errorsForFile(errors, file) {
   return errors.filter((e) => e.file === file);
 }
 
-function formatValidatorForDisplay(errors) {
+function formatValidatorPentruLog(errors) {
   const lines = [];
   for (const file of VALIDATED_FILES) {
     const fileErrors = errorsForFile(errors, file);
     if (fileErrors.length === 0) {
-      lines.push(`validare ok pt repo ${REPO_NAME}, ${repoPath(file)}`);
+      lines.push(`validare ok: ${REPO_NAME}/${repoPath(file)}`);
       continue;
     }
-    lines.push(`eroare in repo ${REPO_NAME}, ${repoPath(file)}`);
+    lines.push(`eroare: ${REPO_NAME}/${repoPath(file)}`);
     for (const e of fileErrors.slice(0, 10)) {
       lines.push(`  linia ${e.line}: ${e.message}`);
-    }
-    if (fileErrors.length > 10) {
-      lines.push(`  ... si inca ${fileErrors.length - 10} eroare/erori.`);
     }
   }
   return lines.join("\n");
@@ -78,9 +75,6 @@ function formatErrorAnnouncement(errors) {
     lines.push(`eroare in repo ${REPO_NAME}, ${repoPath(file)}`);
     for (const e of fileErrors.slice(0, 10)) {
       lines.push(`linia ${e.line}: ${e.message}`);
-    }
-    if (fileErrors.length > 10) {
-      lines.push(`... si inca ${fileErrors.length - 10} eroare/erori.`);
     }
   }
   lines.push("Nu presupune ce trebuia sa scrie utilizatorul. Nu folosi regula invalida pana nu este corectata.");
@@ -121,62 +115,6 @@ function citesteStatusActualizarePlugin() {
   }
 }
 
-function etichetaReminderPentruNotice(item) {
-  if (item.kind === "toate") return "TOATE";
-  if (Array.isArray(item.matched) && item.matched.length > 0) {
-    return item.matched.join("/");
-  }
-  return "trigger";
-}
-
-function formatInserariPentruNotice(selected) {
-  if (selected.length === 0) {
-    return "S-a inserat: nimic.";
-  }
-  const inserari = selected.map((item) => `${etichetaReminderPentruNotice(item)}=${item.body}`);
-  return `S-a inserat: ${inserari.join(" ; ")}`;
-}
-
-function listaScurta(valori, limita = 10) {
-  if (!Array.isArray(valori) || valori.length === 0) return "";
-  const afisate = valori.slice(0, limita);
-  const extra = valori.length > limita ? ` ; ... +${valori.length - limita}` : "";
-  return `${afisate.join(" ; ")}${extra}`;
-}
-
-function formatActualizarePluginPentruNotice(status) {
-  const commit = status?.remoteCommit ? String(status.remoteCommit).slice(0, 12) : "necunoscut";
-  const lines = ["ACTUALIZARE GARDURI DIN GITHUB:"];
-
-  if (status?.status === "ci_main_neaprobat") {
-    lines.push("EXISTA O VERSIUNE NOUA, DAR TESTELE AUTOMATE INCA NU AU CONFIRMAT-O. Pastrez momentan ultima versiune verificata.");
-    lines.push("VERIFICA HOOKUL DIN NOU PESTE CATEVA MINUTE");
-  } else {
-    lines.push(`rezultat: ${status?.status || "necunoscut"}`);
-  }
-
-  lines.push(
-    `commit GitHub verificat: ${commit}`,
-    status?.mesaj || "fara mesaj",
-  );
-
-  if (status?.schimbari?.length) {
-    const schimbari = status.schimbari.map((x) => `${x.status}:${x.path}`);
-    lines.push(`schimbari detectate: ${listaScurta(schimbari, 15)}`);
-  }
-  if (status?.hookuriNoi?.length) lines.push(`HOOKURI NOI detectate: ${listaScurta(status.hookuriNoi)}`);
-  if (status?.skilluriNoi?.length) lines.push(`SKILLS NOI detectate: ${listaScurta(status.skilluriNoi)}`);
-  if (status?.barzauniNoi?.length) lines.push(`BARZAUNI/COMPONENTE NOI necunoscute detectate: ${listaScurta(status.barzauniNoi)}`);
-  if (status?.componenteNoi?.length) lines.push(`componente/foldere noi: ${listaScurta(status.componenteNoi)}`);
-
-  if (status?.reloadNecesar) {
-    lines.push("/reload-plugins NECESAR pentru ca noile/modificatele componente de plugin sa fie incarcate in sesiunea curenta.");
-    if (status.motiveReload?.length) lines.push(`motive reload: ${listaScurta(status.motiveReload, 10)}`);
-  }
-
-  return lines.join("\n");
-}
-
 function pregatesteListeEditare(input) {
   try {
     const rawProtectie = readFileSync(PROTECTIE_PATH, "utf8");
@@ -195,58 +133,39 @@ function pregatesteListeEditare(input) {
   }
 }
 
-function formatListeEditarePentruNotice(statusListe) {
+function ccnScurt(statusActualizare, selected) {
+  const status = statusActualizare?.status || "necunoscut";
+  const linieUpdate = `${FOLDER_UPDATE} a facut verificarea/actualizarea gardurilor (${status}).`;
+  const linieReminder = `${FOLDER_REMINDER} a facut inserarea reminderelor: ${selected.length}.`;
+  return `${linieUpdate} | ${linieReminder}`;
+}
+
+function detaliiListePentruLog(statusListe) {
   if (!statusListe?.ok) {
-    const problema = statusListe?.erori?.[0]?.message || "problema necunoscuta";
-    return `LISTE EFECTIVE DE EDITARE: nu au putut fi verificate/generate. Problema: ${problema}`;
+    return [
+      "LISTE EFECTIVE DE EDITARE: EROARE",
+      ...(statusListe?.erori || []).map((e) => `${e.file}:${e.line || 1} ${e.message}`),
+    ].join("\n");
   }
-  const stare = statusListe.statusListe === "regenerate"
-    ? "regenerate acum deoarece starea efectiva s-a schimbat"
-    : "neschimbate; hashul sursei si starea efectiva sunt aceleasi";
   return [
-    `LISTE EFECTIVE DE EDITARE: ${stare}`,
-    `hash sursa: ${statusListe.hashSursa.slice(0, 16)}`,
+    `LISTE EFECTIVE DE EDITARE: ${statusListe.statusListe}`,
+    `hash sursa: ${statusListe.hashSursa}`,
+    `hash stare: ${statusListe.hashStare}`,
     `generate la: ${statusListe.generatedAt}`,
     `PERMISE: ${statusListe.fisierPermise}`,
     `INTERZISE: ${statusListe.fisierInterzise}`,
   ].join("\n");
 }
 
-function contextListeEditarePentruClaude(statusListe) {
-  if (!statusListe?.ok) {
-    const problema = statusListe?.erori?.[0]?.message || "problema necunoscuta";
-    return [
-      "LISTELE EFECTIVE DE EDITARE NU POT FI VERIFICATE SIGUR.",
-      `Problema: ${problema}`,
-      "Nu presupune permisiunile de editare. PreToolUse trebuie sa ramana fail-closed pentru modificarile pe care nu le poate verifica sigur.",
-    ].join("\n");
-  }
-  const stare = statusListe.statusListe === "regenerate" ? "regenerate la acest prompt" : "neschimbate de la generarea anterioara";
+function detaliiReminderePentruLog(selected) {
+  if (!selected.length) return "REMINDERE INSERATE: niciunul";
   return [
-    `LISTE EFECTIVE DE EDITARE: ${stare}.`,
-    `HASH SURSA: ${statusListe.hashSursa}`,
-    `GENERATE LA: ${statusListe.generatedAt}`,
-    `FISIERE PERMISE: ${statusListe.fisierPermise}`,
-    `FISIERE INTERZISE: ${statusListe.fisierInterzise}`,
+    `REMINDERE INSERATE: ${selected.length}`,
+    ...selected.map((item, index) => {
+      const trigger = Array.isArray(item.matched) && item.matched.length ? item.matched.join("/") : item.kind;
+      return `${index + 1}. ${trigger}\n${item.body}`;
+    }),
   ].join("\n");
-}
-
-function formatVerificareTehnicaPentruNotice(statusActualizare, allErrors, statusListe) {
-  return [
-    "VERIFICARE TEHNICA:",
-    formatActualizarePluginPentruNotice(statusActualizare),
-    formatListeEditarePentruNotice(statusListe),
-    `VALIDARE CONFIGURATIE LOCALA FOLOSITA ACUM:\n${formatValidatorForDisplay(allErrors)}`,
-    `Hook activ: ${HOOK_NAME}`,
-    `Portar actualizare: ${PORTAR_NAME}`,
-    `Program hook: ${PROGRAM_NAME}`,
-    `Motor remindere: ${MOTOR_NAME}`,
-    `PREZENTA COMPONENTEI:\n${formatComponentPresence(PLUGIN_NAME, ROOT)}`,
-  ].join("\n\n");
-}
-
-function noticePeUnSingurRand(text) {
-  return String(text).replace(/\s*\r?\n+\s*/g, " | ");
 }
 
 const stdinText = await readStdin();
@@ -261,11 +180,10 @@ const statusActualizare = citesteStatusActualizarePlugin();
 const allErrors = validateAll();
 const statusListe = pregatesteListeEditare(input);
 let selected = [];
-let reminderFileErrors = [];
 
 try {
   const rawReminders = readFileSync(REMINDERS_PATH, "utf8");
-  reminderFileErrors = validateRemindere(rawReminders, FILE_REMINDERE);
+  const reminderFileErrors = validateRemindere(rawReminders, FILE_REMINDERE);
   if (reminderFileErrors.length === 0) {
     const config = parseReminderConfig(rawReminders);
     const currentPrompt = typeof input.prompt === "string" ? input.prompt : "";
@@ -273,25 +191,29 @@ try {
     selected = selectReminders(config, currentPrompt, previousAssistant);
   }
 } catch {
-  // validateAll() raporteaza deja fisierul lipsa / imposibil de citit
+  // validateAll() raporteaza deja fisierul lipsa / imposibil de citit.
 }
 
 const injectedContext = formatInjectedForContext(selected);
-const displayCuStructuraNormala = [
-  formatInserariPentruNotice(selected),
-  formatVerificareTehnicaPentruNotice(statusActualizare, allErrors, statusListe),
-].join("\n\n");
-const display = noticePeUnSingurRand(displayCuStructuraNormala);
+const contextParts = [];
 
-const contextParts = [contextListeEditarePentruClaude(statusListe)];
+/*
+IMPORTANT pentru testul si arhitectura PreToolUse:
+listele PERMISE/INTERZISE sunt generate/verificate aici, dar NU sunt
+injectate in additionalContext. Claude nu afla preventiv din UserPromptSubmit
+ce fisiere sunt protejate; primul semnal despre un blocaj vine din PreToolUse.
+*/
+
 if (statusActualizare?.reloadNecesar) {
   contextParts.push([
     "ANUNTA UTILIZATORUL CA:",
-    "Actualizarea YL-Claude-garduri a detectat componente de plugin noi/modificate care nu devin active sigur doar prin schimbarea fisierelor locale.",
-    "Este necesar /reload-plugins in sesiunea curenta inainte sa pretinzi ca noile hookuri/skills/componente sunt active.",
+    "Actualizarea YL-Claude-garduri a detectat componente structurale noi/modificate.",
+    "In Claude Code Web este necesara o SESIUNE/CHAT NOU pentru activarea sigura a acelor componente.",
+    "Nu pretinde ca noile hookuri/skills/componente sunt active in sesiunea curenta.",
     statusActualizare.motiveReload?.length ? `Motive: ${statusActualizare.motiveReload.join(" ; ")}` : "",
   ].filter(Boolean).join("\n"));
 }
+
 if (["verificare_remote_esuat", "fetch_esuat", "remote_invalid", "comparare_esuat", "actualizare_esuat"].includes(statusActualizare?.status)) {
   contextParts.push([
     "ANUNTA UTILIZATORUL CA:",
@@ -300,18 +222,52 @@ if (["verificare_remote_esuat", "fetch_esuat", "remote_invalid", "comparare_esua
     "Nu pretinde ca ruleaza ultima versiune GitHub daca actualizarea nu a reusit.",
   ].join("\n"));
 }
+
 if (allErrors.length > 0) {
   contextParts.push(formatErrorAnnouncement(allErrors));
 }
+
 if (injectedContext) {
   contextParts.push(injectedContext);
 }
 
+const additionalContext = contextParts.join("\n\n");
+let display = ccnScurt(statusActualizare, selected);
+
+const detaliiLog = [
+  "STATUS ACTUALIZARE GARDURI:",
+  JSON.stringify(statusActualizare, null, 2),
+  "",
+  detaliiListePentruLog(statusListe),
+  "",
+  "VALIDARE CONFIGURATIE:",
+  formatValidatorPentruLog(allErrors),
+  "",
+  detaliiReminderePentruLog(selected),
+  "",
+  `ROOT RUNTIME PLUGIN: ${ROOT}`,
+].join("\n");
+
+try {
+  scrieLogActivitateHook({
+    sessionId: input?.session_id,
+    hookEvent: "UserPromptSubmit",
+    folderHookRepo: `${FOLDER_UPDATE} + ${FOLDER_REMINDER}`,
+    activitate: "a verificat/actualizat gardurile, a generat/verificat listele de editare si a selectat reminderele",
+    ccn: display,
+    additionalContext,
+    alteMesajeCatreClaude: "",
+    alteActivitati: detaliiLog,
+  });
+} catch (error) {
+  display += ` | ${FOLDER_UPDATE} nu a putut scrie ${path.basename(CALE_LOG_ACTIVITATE_HOOKS)}.`;
+}
+
 const output = { systemMessage: display };
-if (contextParts.length > 0) {
+if (additionalContext) {
   output.hookSpecificOutput = {
     hookEventName: "UserPromptSubmit",
-    additionalContext: contextParts.join("\n\n"),
+    additionalContext,
   };
 }
 
