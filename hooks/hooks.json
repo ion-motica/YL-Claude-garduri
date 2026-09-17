@@ -9,6 +9,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/Hook PreToolUse - inainte sa modifice Claude un fisier verifica daca e protejat si opreste modificarea/program_hook_PreToolUse_verifica_listele_si_opreste_modificarea_fisierului_protejat.mjs\""
+          }
+        ]
+      }
     ]
   }
 }
