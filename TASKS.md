@@ -4,6 +4,7 @@ Documentatie de continuitate si learnings verificate:
 - `2 Learnings din construirea gardurilor/README.md`
 - `2 Learnings din construirea gardurilor/PLAN_CONTINUARE_GARDURI.md`
 - `2 Learnings din construirea gardurilor/CI_GITHUB_ACTIONS_TESTE_AUTOMATE.md`
+- `2 Learnings din construirea gardurilor/CCN_VS_ADDITIONAL_CONTEXT.md`
 
 - [x] 1. Definitivare sursa de adevar pentru fisiere protejate si exceptii
 - [x] 2. Hook UserPromptSubmit — infrastructura + remindere
@@ -26,6 +27,7 @@ Documentatie de continuitate si learnings verificate:
   - [x] bootstrap nou instalat o singura data in runtime-ul Claude Code Web; confirmat fara dependenta de `/reload-plugins`
   - [x] verificare end-to-end: schimbare TXT `test33 -> test44` -> urmatorul prompt din acelasi chat a vazut imediat versiunea noua
   - [x] gate CI implementat: inainte de update, `main` trebuie sa fie identic cu reperul `ci-passed`
+  - [ ] clarificare/audit `CCN/systemMessage` vs `additionalContext`: politica explicita de observabilitate, ce vede userul vs ce primeste Claude, eliminarea contextului ascuns neintentionat si teste per eveniment
   - [ ] activare runtime a gate-ului CI prin rebuild environment + chat nou
   - [ ] verificare end-to-end dupa separare: noua structura update-global + reminder ruleaza corect intr-un chat nou
   - [ ] verificare end-to-end: schimbare cod simplu `.mjs` -> urmatorul prompt ruleaza codul nou
@@ -58,6 +60,7 @@ Documentatie de continuitate si learnings verificate:
   - [x] test automat pentru logica `main == ci-passed` / `main != ci-passed` / reper lipsa
   - [x] bateria GitHub Actions dupa separarea folderelor a avut PASS
   - [ ] test end-to-end al gate-ului CI in Claude Code Web
+  - [ ] test explicit ca `systemMessage` si `additionalContext` ajung pe canalele asteptate pentru fiecare hook folosit
   - [ ] extindere baterie pe fiecare gard nou
 
 ## Directive transversale
@@ -73,5 +76,6 @@ Documentatie de continuitate si learnings verificate:
 9. Runtime-ul nu instaleaza un `main` nou pana cand `refs/heads/ci-passed` nu indica exact acelasi commit; daca verificarea CI nu poate fi confirmata, update-ul este fail-safe blocat.
 10. Nu transforma un blocaj local intr-un blocaj global: continua cu ce se poate continua, iar cand nu se mai poate fara input, opreste si prezinta contextul, motivul si optiunile.
 11. Nu largi scope-ul tacit in reparatii si nu rezolva tacit conflicte arhitecturale.
+12. Nu presupune ca textul vizibil in CCN este identic cu textul primit de Claude; `systemMessage` si `additionalContext` sunt canale distincte si trebuie auditate explicit per hook/eveniment.
 
 Sursa pentru regulile de Notice: `1 Sursa adevar/directiva-generala-claude-notice.txt`.
