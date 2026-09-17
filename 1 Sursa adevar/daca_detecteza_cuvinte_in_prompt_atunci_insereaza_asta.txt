@@ -22,8 +22,8 @@ insereazaInToatePrompturile {{
 }}
 */
 
-dacaGaseste(test44)
-   atunciIncludeInPrompt {{ test44444444444444444444444444444444444 }}
+dacaGaseste(test55)
+   atunciIncludeInPrompt {{ test55555555555555555555555555555555555 }}
 
 
 
