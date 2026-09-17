@@ -22,9 +22,12 @@ blocheazaEditareFisiereSiFoldere {
   js/motor-optiuni-control-panel.js
   js/cp-shell.js
   js/cp-registry.js
+  1 Hook Tests/momeala_PRETOOLUSE_fara_exceptie.txt
+  1 Hook Tests/momeala_PRETOOLUSE_cu_exceptie.txt
 }
 
-permiteEditarePanaLa(2026.09.15-18.00 Europe/Bucharest) {
+permiteEditarePanaLa(2026.09.17-18.00 Europe/Bucharest) {
+  1 Hook Tests/momeala_PRETOOLUSE_cu_exceptie.txt
 }
 
 permiteEditareTOT_REPOSITORYPanaLa(2026.09.15-18.00 Europe/Bucharest) {
