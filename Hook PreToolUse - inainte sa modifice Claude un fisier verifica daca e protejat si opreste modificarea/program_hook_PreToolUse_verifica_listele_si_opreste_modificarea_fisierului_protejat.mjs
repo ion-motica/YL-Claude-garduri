@@ -215,20 +215,38 @@ async function main() {
 
   if (Object.keys(output).length > 0) {
     try {
+      const toolName = input?.tool_name || "tool";
+      const primaLinieMotiv = reason ? String(reason).split(/\r?\n/)[0] : "";
+      const actiuniHuman = decision === "deny"
+        ? [
+            `A blocat activarea uneltei ${toolName} pentru ${target}.`,
+            primaLinieMotiv ? `Motiv: ${primaLinieMotiv}` : "Motiv: regula de protectie a blocat operatia.",
+          ]
+        : [
+            `A permis activarea uneltei ${toolName} pentru ${target}.`,
+          ];
+
       scrieLogActivitateHook({
         sessionId: input?.session_id,
         hookEvent: "PreToolUse",
         repositoryRoot: input?.cwd,
+        transcriptPath: input?.transcript_path || "",
         folderHookRepo: FOLDER_HOOK,
-        toolName: input?.tool_name || "",
+        toolName,
         targetPath: target,
         permissionDecision: decision,
         activitate: decision === "deny"
-          ? `a blocat apelul ${input?.tool_name || "tool"} pentru ${target}`
-          : `a permis continuarea apelului ${input?.tool_name || "tool"} pentru ${target}`,
+          ? `a blocat apelul ${toolName} pentru ${target}`
+          : `a permis continuarea apelului ${toolName} pentru ${target}`,
         ccn: output.systemMessage || "",
         additionalContext,
         permissionDecisionReason: reason,
+        humanGarduri: [
+          {
+            folder: FOLDER_HOOK,
+            actiuni: actiuniHuman,
+          },
+        ],
         alteMesajeCatreClaude: "",
         alteActivitati: [
           `tool_name: ${input?.tool_name || "(lipsa)"}`,
