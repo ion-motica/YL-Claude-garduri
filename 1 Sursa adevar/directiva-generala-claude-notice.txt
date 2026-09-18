@@ -50,9 +50,26 @@ Exista DOUA fisiere de log, produse de acelasi helper comun si acelasi apel al g
 
 1. log human readable.txt
    - jurnal scurt si usor de citit de om;
-   - spune ce gard a rulat, ce hook l-a declansat, ce a facut, decizia principala;
-   - poate arata textul trimis efectiv lui Claude cand acesta este util pentru intelegere;
+   - fiecare inregistrare incepe cu:
+     =======================================
+     data/ora;
+     titlul chatului;
+     promptul trimis de utilizator lui Claude;
+   - dupa antet, fiecare gard activat este afisat SEPARAT, in ordinea activarii;
+   - pentru fiecare gard, titlul este chiar numele folderului gardului din repo;
+   - sub titlu se scrie numai ce este relevant, de exemplu:
+     "Nu a detectat nimic de facut.";
+     "A inserat in CCN:" + continutul;
+     "A inserat in additional context:" + continutul;
+     "A blocat activarea uneltei X pentru Y." + motivul scurt;
+     "A sesizat incalcarea regulii X si a facut Y.";
+   - nu combina doua garduri intr-un singur titlu de tip "GARD: A + B";
+   - nu afisa mecanic toate campurile daca nu sunt relevante;
    - nu contine dumpuri tehnice, hashuri sau diagnostice lungi.
+   - titlul chatului se citeste din transcript cand exista eveniment ai-title/custom-title;
+     daca nu este disponibil, se spune explicit ca titlul este indisponibil.
+   - promptul curent se ia direct din UserPromptSubmit; la hookurile ulterioare
+     se poate recupera ultimul prompt user din transcript.
 
 2. log tehnic.txt
    - jurnal complet pentru diagnostic;
@@ -74,7 +91,10 @@ SECTIUNEA_COMUNA din logul tehnic trebuie sa contina cel putin:
 - rootul runtime al pluginului si commitul lui Git;
 - versiunea Node si platforma/arhitectura;
 - repository-ul remote si clona locala folosite pentru logging;
-- commitul repository-ului de log inainte de intrarea curenta.
+- commitul repository-ului de log inainte de intrarea curenta;
+- transcript_path;
+- titlul chatului, cand poate fi determinat;
+- promptul utilizatorului asociat activarii gardului.
 
 CANALE_CATRE_CLAUDE trebuie sa pastreze exact, separat:
 - CCN / systemMessage;
