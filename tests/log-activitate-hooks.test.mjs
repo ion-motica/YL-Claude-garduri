@@ -2,10 +2,18 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { scrieLogActivitateHook } from "../shared/program_scrie_log_activitate_hooks.mjs";
+import {
+  caleLogActivitateHooksDinRepository,
+  scrieLogActivitateHook,
+} from "../shared/program_scrie_log_activitate_hooks.mjs";
 
 const dir = mkdtempSync(path.join(os.tmpdir(), "yl-hook-log-test-"));
 const filePath = path.join(dir, "log activitate hooks.txt");
+
+assert.equal(
+  caleLogActivitateHooksDinRepository("/repo/yl"),
+  path.join("/repo/yl", "1 Hook Tests", "log activitate hooks.txt"),
+);
 
 scrieLogActivitateHook({
   sessionId: "sesiune-test",
