@@ -202,6 +202,21 @@ permiteEditarePanaLa(2026.09.17-15.00 Europe/Bucharest) {
 }
 
 {
+  const rootPrincipal = repoTemporar();
+  const rootSecundar = repoTemporar();
+
+  const output = proceseazaPreToolUse({
+    session_id: "hook-alt-repo",
+    cwd: rootPrincipal,
+    tool_name: "Write",
+    tool_input: { file_path: path.join(rootSecundar, "js", "fix.js") },
+  }, { rawProtectie: RAW_BAZA });
+
+  assert.equal(output.hookSpecificOutput, undefined);
+  assert.match(output.systemMessage, /a facut verificarea si a permis modificarea intr-un alt repository Git/);
+}
+
+{
   const root = repoTemporar();
   const outputNou = proceseazaPreToolUse({
     session_id: "hook-fisier-nou",
@@ -247,8 +262,8 @@ permiteEditarePanaLa(2026.09.17-15.00 Europe/Bucharest) {
   }, { rawProtectie: RAW_BAZA });
 
   assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
-  assert.match(output.systemMessage, /a facut verificarea si a blocat modificarea deoarece tinta nu poate fi raportata sigur la repository/);
-  assert.match(output.hookSpecificOutput.permissionDecisionReason, /in afara repository-ului curent/i);
+  assert.match(output.systemMessage, /a facut verificarea si a blocat modificarea deoarece repository-ul tintei nu poate fi identificat sigur/);
+  assert.match(output.hookSpecificOutput.permissionDecisionReason, /nu apartine unui repository Git/i);
 }
 
-console.log("PRETOOLUSE PROTECTIE EDITARE + LISTE HASH + CCN SCURT TEST OK");
+console.log("PRETOOLUSE PROTECTIE EDITARE + ALT REPO GIT + LISTE HASH + CCN SCURT TEST OK");
