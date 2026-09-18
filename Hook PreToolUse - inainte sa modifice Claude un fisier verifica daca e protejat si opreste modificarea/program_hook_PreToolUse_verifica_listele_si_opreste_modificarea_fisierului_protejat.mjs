@@ -225,7 +225,8 @@ async function main() {
           : `a permis continuarea apelului ${input?.tool_name || "tool"} pentru ${target}`,
         ccn: output.systemMessage || "",
         additionalContext,
-        alteMesajeCatreClaude: reason,
+        permissionDecisionReason: reason,
+        alteMesajeCatreClaude: "",
         alteActivitati: [
           `tool_name: ${input?.tool_name || "(lipsa)"}`,
           `file_path: ${target}`,
