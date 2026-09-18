@@ -193,6 +193,7 @@ async function main() {
       scrieLogActivitateHook({
         sessionId: input?.session_id,
         hookEvent: "PreToolUse",
+        repositoryRoot: input?.cwd,
         folderHookRepo: FOLDER_HOOK,
         activitate: decision === "deny"
           ? `a blocat apelul ${input?.tool_name || "tool"} pentru ${target}`
