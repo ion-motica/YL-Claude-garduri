@@ -7,6 +7,8 @@ import {
   caleRepositoryLogLocal,
   citesteTitluChatDinTranscript,
   citesteUltimulPromptUserDinTranscript,
+  extrageTitluChatDeclarat,
+  memoreazaTitluChatDeclaratDeUser,
   memoreazaTitluSesiune,
   NUME_FISIER_LOG_HUMAN_READABLE,
   NUME_FISIER_LOG_TEHNIC,
@@ -41,6 +43,37 @@ writeFileSync(
 
 assert.equal(citesteTitluChatDinTranscript(transcriptPath), "Titlu chat test");
 assert.equal(citesteUltimulPromptUserDinTranscript(transcriptPath), "prompt curent din transcript");
+assert.equal(
+  extrageTitluChatDeclarat("TITLU_CHAT: Garduri - diagnostic\n\nContinua taskul"),
+  "Garduri - diagnostic",
+);
+assert.equal(extrageTitluChatDeclarat("prompt fara titlu"), "");
+
+const sesiuneTitluDeclarat = `sesiune-titlu-declarat-${process.pid}-${Date.now()}`;
+assert.equal(memoreazaTitluSesiune({
+  sessionId: sesiuneTitluDeclarat,
+  sessionTitle: "Titlu automat anterior",
+}), true);
+assert.deepEqual(memoreazaTitluChatDeclaratDeUser({
+  sessionId: sesiuneTitluDeclarat,
+  promptText: "TITLU_CHAT: Titlu ales de utilizator\nPrimul prompt",
+}), {
+  titlu: "Titlu ales de utilizator",
+  acceptatAcum: true,
+  motiv: "prima declaratie TITLU_CHAT a fost memorata pentru aceasta sesiune",
+});
+assert.deepEqual(memoreazaTitluChatDeclaratDeUser({
+  sessionId: sesiuneTitluDeclarat,
+  promptText: "TITLU_CHAT: Incercare de schimbare ulterioara",
+}), {
+  titlu: "Titlu ales de utilizator",
+  acceptatAcum: false,
+  motiv: "titlul fusese deja declarat de utilizator pentru aceasta sesiune",
+});
+assert.equal(memoreazaTitluSesiune({
+  sessionId: sesiuneTitluDeclarat,
+  sessionTitle: "Titlu venit ulterior din SessionStart",
+}), false);
 
 const transcriptIntarziatPath = path.join(dir, "transcript-intarziat.jsonl");
 writeFileSync(

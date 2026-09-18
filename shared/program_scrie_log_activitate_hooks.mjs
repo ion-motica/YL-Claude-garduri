@@ -127,8 +127,54 @@ export function memoreazaTitluSesiune({ sessionId, sessionTitle } = {}) {
   const titlu = typeof sessionTitle === "string" ? sessionTitle.trim() : "";
   if (!titlu) return false;
   const stare = citesteStareSesiune(sessionId);
-  scrieStareSesiune(sessionId, { ...stare, chatTitle: titlu });
+  if (stare.chatTitleDeclaratDeUser) return false;
+  scrieStareSesiune(sessionId, {
+    ...stare,
+    chatTitle: titlu,
+    chatTitleSource: "session_start",
+  });
   return true;
+}
+
+export function extrageTitluChatDeclarat(promptText) {
+  const text = typeof promptText === "string" ? promptText : "";
+  for (const linie of text.split(/\r?\n/)) {
+    const potrivire = linie.match(/^\s*TITLU_CHAT\s*:\s*(.*?)\s*$/i);
+    if (potrivire?.[1]) return potrivire[1].trim();
+  }
+  return "";
+}
+
+export function memoreazaTitluChatDeclaratDeUser({ sessionId, promptText } = {}) {
+  const stare = citesteStareSesiune(sessionId);
+  if (stare.chatTitleDeclaratDeUser) {
+    return {
+      titlu: stare.chatTitle || "",
+      acceptatAcum: false,
+      motiv: "titlul fusese deja declarat de utilizator pentru aceasta sesiune",
+    };
+  }
+
+  const titlu = extrageTitluChatDeclarat(promptText);
+  if (!titlu) {
+    return {
+      titlu: stare.chatTitle || "",
+      acceptatAcum: false,
+      motiv: "promptul nu contine o declaratie TITLU_CHAT",
+    };
+  }
+
+  scrieStareSesiune(sessionId, {
+    ...stare,
+    chatTitle: titlu,
+    chatTitleSource: "user_prompt",
+    chatTitleDeclaratDeUser: true,
+  });
+  return {
+    titlu,
+    acceptatAcum: true,
+    motiv: "prima declaratie TITLU_CHAT a fost memorata pentru aceasta sesiune",
+  };
 }
 
 function memoreazaPromptCurent({ sessionId, promptId, promptText, chatTitle, dataOra }) {

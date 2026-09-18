@@ -98,3 +98,19 @@ Sursa explicita a regulii de afisare este:
 ```text
 1 Sursa adevar/directiva-generala-claude-notice.txt
 ```
+
+## Titlul chatului in loguri
+
+Pentru un titlu determinist, utilizatorul il declara o singura data intr-un prompt:
+
+```text
+TITLU_CHAT: Garduri pentru Claude - logging hooks
+
+Continua taskul...
+```
+
+Hookul `UserPromptSubmit` memoreaza prima declaratie `TITLU_CHAT:` separat pentru
+fiecare `session_id`, o foloseste in logurile human-readable si tehnic si o trimite
+catre Claude Code prin `hookSpecificOutput.sessionTitle`. Declaratiile ulterioare
+din aceeasi sesiune nu schimba titlul memorat. Linia ramane in promptul exact,
+deoarece `UserPromptSubmit` poate adauga context, dar nu poate rescrie promptul.

@@ -17,6 +17,7 @@ import {
 import { asiguraListeEfectiveDeEditare } from "../Hook PreToolUse - inainte sa modifice Claude un fisier verifica daca e protejat si opreste modificarea/motor_calculeaza_liste_efective_de_fisiere_permise_si_interzise.mjs";
 import {
   CALE_LOG_ACTIVITATE_HOOKS,
+  memoreazaTitluChatDeclaratDeUser,
   scrieLogActivitateHook,
 } from "../shared/program_scrie_log_activitate_hooks.mjs";
 
@@ -242,6 +243,11 @@ const promptCurentPentruLog =
   typeof input.user_prompt === "string" ? input.user_prompt :
   "";
 
+const rezultatTitluChat = memoreazaTitluChatDeclaratDeUser({
+  sessionId: input?.session_id,
+  promptText: promptCurentPentruLog,
+});
+
 const linieCcnUpdater = `${FOLDER_UPDATE} a facut verificarea/actualizarea gardurilor (${statusActualizare?.status || "necunoscut"}).`;
 const linieCcnReminder = `${FOLDER_REMINDER} a facut inserarea reminderelor: ${selected.length}.`;
 
@@ -254,6 +260,9 @@ if (statusActualizare?.status === "deja_la_zi") {
   actiuniUpdaterHuman.push(`A sesizat statusul updaterului: ${statusActualizare?.status || "necunoscut"}.`);
 }
 actiuniUpdaterHuman.push("A inserat in CCN:", linieCcnUpdater);
+if (rezultatTitluChat.acceptatAcum) {
+  actiuniUpdaterHuman.push(`A memorat TITLU_CHAT pentru aceasta sesiune: ${rezultatTitluChat.titlu}`);
+}
 
 const actiuniReminderHuman = selected.length === 0
   ? ["Nu a detectat nimic de facut."]
@@ -275,6 +284,9 @@ const detaliiLog = [
   "",
   detaliiReminderePentruLog(selected),
   "",
+  `TITLU CHAT: ${rezultatTitluChat.motiv}`,
+  `valoare efectiva: ${rezultatTitluChat.titlu || "(nespecificat de utilizator)"}`,
+  "",
   `ROOT RUNTIME PLUGIN: ${ROOT}`,
 ].join("\n");
 
@@ -283,6 +295,7 @@ try {
     repositoryRoot: input?.cwd,
     transcriptPath: input?.transcript_path || "",
     promptText: promptCurentPentruLog,
+    chatTitle: rezultatTitluChat.titlu,
     sessionId: input?.session_id,
     promptId: input?.prompt_id,
     hookEvent: "UserPromptSubmit",
@@ -308,11 +321,14 @@ try {
 }
 
 const output = { systemMessage: display };
-if (additionalContext) {
+if (additionalContext || rezultatTitluChat.acceptatAcum) {
   output.hookSpecificOutput = {
     hookEventName: "UserPromptSubmit",
-    additionalContext,
   };
+  if (additionalContext) output.hookSpecificOutput.additionalContext = additionalContext;
+  if (rezultatTitluChat.acceptatAcum) {
+    output.hookSpecificOutput.sessionTitle = rezultatTitluChat.titlu;
+  }
 }
 
 console.log(JSON.stringify(output));
