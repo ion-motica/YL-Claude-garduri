@@ -6,6 +6,8 @@ import {
   asiguraListeEfectiveDeEditare,
   caleRelativaLaRepository,
   citesteListaGenerata,
+  gasesteRootRepository,
+  gasesteRootRepositoryPentruTinta,
   verdictPentruCale,
 } from "./motor_calculeaza_liste_efective_de_fisiere_permise_si_interzise.mjs";
 import {
@@ -92,6 +94,29 @@ export function proceseazaPreToolUse(input, {
     });
   }
 
+  let rootSesiune;
+  let rootTinta;
+  try {
+    rootSesiune = gasesteRootRepository(input.cwd);
+    rootTinta = gasesteRootRepositoryPentruTinta(caleAbsoluta);
+  } catch (error) {
+    const reason = [
+      "Nu pot verifica sigur repository-ul pentru aceasta modificare.",
+      `Problema concreta: ${error.message}`,
+      "Din siguranta, nu modifica fisierul prin acest apel.",
+    ].join("\n");
+    return outputDeny({
+      systemMessage: ccnScurt("verificarea si a blocat modificarea deoarece repository-ul tintei nu poate fi identificat sigur"),
+      reason,
+    });
+  }
+
+  if (path.resolve(rootTinta) !== path.resolve(rootSesiune)) {
+    return {
+      systemMessage: ccnScurt("verificarea si a permis modificarea intr-un alt repository Git"),
+    };
+  }
+
   let continutProtectie = rawProtectie;
   if (continutProtectie === null) {
     try {
@@ -110,7 +135,7 @@ export function proceseazaPreToolUse(input, {
   }
 
   const rezultat = asiguraListeEfectiveDeEditare({
-    cwd: input.cwd,
+    cwd: rootSesiune,
     rawProtectie: continutProtectie,
     sessionId: input.session_id,
     now,
