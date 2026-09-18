@@ -35,6 +35,13 @@ Scopul CCN este doar sa confirme rapid utilizatorului:
 
 REGULA LOG ACTIVITATE HOOKS
 
+Implementarea canonica unica pentru logging este:
+shared/program_scrie_log_activitate_hooks.mjs
+
+Toate hookurile existente si viitoare folosesc acest helper.
+Nu crea logger separat intr-un hook; daca se schimba destinatia sau formatul logului,
+schimbarea se face in helperul comun.
+
 Detaliile complete se scriu in fisierul runtime din repository-ul de lucru YL:
 
 1 Hook Tests/log activitate hooks.txt
@@ -87,6 +94,12 @@ dar nu le injecteaza automat in additionalContext doar pentru ca exista.
 Pentru testarea curata si pentru separarea responsabilitatilor,
 primul semnal catre Claude despre un fisier blocat trebuie sa poata veni
 din PreToolUse atunci cand modificarea concreta este incercata.
+
+PreToolUse aplica regulile de protectie repository-ului principal al sesiunii.
+Daca tinta Edit/Write apartine unui ALT repository Git valid, nu aplica regulile YL
+acelui repository si permite modificarea.
+Daca tinta nu poate fi identificata ca apartinand unui repository Git, blocheaza fail-closed.
+Nu confunda cwd-ul sesiunii cu repository-ul tintei.
 
 REGULA PORTARULUI DE ACTUALIZARE
 
