@@ -159,6 +159,34 @@ export function gasesteRootRepository(cwd) {
   }).trim();
 }
 
+function directorExistentPentruTinta(caleAbsoluta) {
+  let director = path.dirname(path.resolve(caleAbsoluta));
+  while (!existsSync(director)) {
+    const parinte = path.dirname(director);
+    if (parinte === director) {
+      throw new Error("nu exista niciun director parinte accesibil pentru calea tinta");
+    }
+    director = parinte;
+  }
+  return director;
+}
+
+export function gasesteRootRepositoryPentruTinta(caleAbsoluta) {
+  if (typeof caleAbsoluta !== "string" || !caleAbsoluta.trim()) {
+    throw new Error("hookul nu a furnizat calea tinta");
+  }
+
+  const director = directorExistentPentruTinta(caleAbsoluta);
+  try {
+    return execFileSync("git", ["-C", director, "rev-parse", "--show-toplevel"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+  } catch {
+    throw new Error("calea tinta nu apartine unui repository Git");
+  }
+}
+
 function listeazaFisiereRepository(root) {
   const raw = execFileSync("git", ["-C", root, "ls-files", "-co", "--exclude-standard", "-z"], {
     encoding: "utf8",
