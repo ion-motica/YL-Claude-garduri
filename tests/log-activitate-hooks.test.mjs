@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,9 +11,10 @@ import {
 const dir = mkdtempSync(path.join(os.tmpdir(), "yl-hook-log-test-"));
 const filePath = path.join(dir, "log activitate hooks.txt");
 
+const exempluRoot = path.join(dir, "repo-yl");
 assert.equal(
-  caleLogActivitateHooksDinRepository("/repo/yl"),
-  path.join("/repo/yl", "1 Hook Tests", "log activitate hooks.txt"),
+  caleLogActivitateHooksDinRepository(exempluRoot),
+  path.join(exempluRoot, "1 Hook Tests", "log activitate hooks.txt"),
 );
 
 scrieLogActivitateHook({
@@ -36,4 +38,31 @@ assert.match(text, /ALTE_MESAJE_CATRE_CLAUDE_BEGIN\npermissionDecisionReason de 
 assert.match(text, /ALTE_ACTIVITATI_BEGIN\nactivitate interna 1\nactivitate interna 2\nALTE_ACTIVITATI_END/);
 assert.match(text, /DATA_ORA: 2026\.09\.17-17\.00\.00 Europe\/Bucharest/);
 
-console.log("LOG ACTIVITATE HOOKS TEST OK");
+const repoGit = mkdtempSync(path.join(os.tmpdir(), "yl-hook-log-git-test-"));
+execFileSync("git", ["init", repoGit], { stdio: "ignore" });
+
+const caleRuntime = scrieLogActivitateHook({
+  sessionId: "sesiune-git-test",
+  hookEvent: "UserPromptSubmit",
+  folderHookRepo: "Hook Test",
+  activitate: "testeaza log in repo",
+  repositoryRoot: repoGit,
+});
+
+assert.equal(
+  caleRuntime,
+  path.join(repoGit, "1 Hook Tests", "log activitate hooks.txt"),
+);
+
+const caleIgnorata = execFileSync(
+  "git",
+  ["-C", repoGit, "check-ignore", "1 Hook Tests/log activitate hooks.txt"],
+  { encoding: "utf8" },
+).trim();
+
+assert.equal(caleIgnorata, "1 Hook Tests/log activitate hooks.txt");
+
+const textRuntime = readFileSync(caleRuntime, "utf8");
+assert.match(textRuntime, /GIT_LOCAL_EXCLUDE: OK:/);
+
+console.log("LOG ACTIVITATE HOOKS + CALE YL + GIT LOCAL EXCLUDE TEST OK");
