@@ -42,21 +42,23 @@ Toate hookurile existente si viitoare folosesc acest helper.
 Nu crea logger separat intr-un hook; daca se schimba destinatia sau formatul logului,
 schimbarea se face in helperul comun.
 
-Detaliile complete se scriu in fisierul runtime din repository-ul de lucru YL:
+Detaliile complete se scriu persistent in repository-ul separat:
 
-1 Hook Tests/log activitate hooks.txt
+ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude
 
-Hookul foloseste cwd-ul repository-ului primit de la Claude Code.
-Daca acest cwd lipseste, foloseste process.cwd() ca fallback.
+Fisierul canonic este:
+log activitate hooks.txt
 
-Fisierul de log este pastrat in repository-ul de lucru pentru audit si inspectie.
-Helperul de logging trebuie sa asigure local regula:
-1 Hook Tests/log activitate hooks.txt
-in .git/info/exclude al repository-ului de lucru, astfel incat logarea continua
-sa nu murdareasca working tree-ul si sa nu intre in commituri.
+Helperul comun foloseste o clona tehnica separata, in /tmp, pentru fiecare sesiune.
+La fiecare intrare de log:
+- sincronizeaza clona cu branch-ul main;
+- adauga intrarea;
+- face commit;
+- face push pe main.
 
-Nu este necesara modificarea .gitignore din repository-ul YL pentru aceasta regula
-de runtime; excluderea este locala workspace-ului.
+Repository-ul de lucru YL nu mai este destinatia logului si nu trebuie murdarit
+de logging. Hookurile individuale nu implementeaza clone/pull/commit/push;
+toata aceasta responsabilitate ramane numai in helperul comun.
 
 Fiecare hook existent si fiecare hook nou trebuie sa inregistreze:
 - data si ora;
@@ -66,7 +68,8 @@ Fiecare hook existent si fiecare hook nou trebuie sa inregistreze:
 - ce a facut;
 - textul exact trimis in CCN / systemMessage;
 - textul exact trimis in additionalContext;
-- orice alt mesaj trimis lui Claude, de exemplu permissionDecisionReason;
+- permissionDecisionReason, cand exista, intr-o sectiune explicita;
+- orice alt mesaj trimis lui Claude;
 - alte activitati tehnice relevante.
 
 In log se folosesc randuri normale cu newline.
