@@ -250,6 +250,7 @@ const detaliiLog = [
 
 try {
   scrieLogActivitateHook({
+    repositoryRoot: input?.cwd,
     sessionId: input?.session_id,
     hookEvent: "UserPromptSubmit",
     folderHookRepo: `${FOLDER_UPDATE} + ${FOLDER_REMINDER}`,
