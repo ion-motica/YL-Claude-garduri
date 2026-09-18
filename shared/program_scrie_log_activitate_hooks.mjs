@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,7 +14,7 @@ export const URL_REPOSITORY_LOG_ACTIVITATE_HOOKS =
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_PLUGIN = path.resolve(__dirname, "..");
-const LOG_SCHEMA_VERSION = "2";
+const LOG_SCHEMA_VERSION = "3";
 
 function idSigur(value) {
   return String(value || "fara-sesiune").replace(/[^A-Za-z0-9._-]/g, "_");
@@ -37,9 +37,11 @@ export const CALE_LOG_ACTIVITATE_HOOKS = path.join(
 
 const HEADER_HUMAN = `LOG HUMAN READABLE - YL-Claude-garduri
 
-Scop: jurnal scurt si usor de citit despre ce a facut fiecare gard.
-Un gard = hook Claude Code + programul nostru declansat de acel hook.
+Fiecare inregistrare porneste de la un eveniment de hook.
+Antetul arata data/ora, titlul chatului si promptul utilizatorului.
+Dupa antet, gardurile declansate sunt listate separat, in ordinea activarii.
 
+Un gard = hook Claude Code + programul nostru declansat de acel hook.
 Pentru diagnostic complet vezi "log tehnic.txt".
 
 `;
@@ -79,6 +81,65 @@ function dataOraBucuresti(now = new Date()) {
 function textSauNimic(value) {
   const text = value == null ? "" : String(value);
   return text.length ? text : "(nimic)";
+}
+
+function continutMesajCaText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map((part) => {
+    if (typeof part === "string") return part;
+    if (part && typeof part.text === "string") return part.text;
+    if (part && typeof part.content === "string") return part.content;
+    return "";
+  }).filter(Boolean).join("\n");
+}
+
+function citesteTranscriptJsonl(transcriptPath) {
+  if (!transcriptPath || !existsSync(transcriptPath)) return [];
+  try {
+    return readFileSync(transcriptPath, "utf8")
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((linie) => {
+        try { return JSON.parse(linie); } catch { return null; }
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+export function citesteTitluChatDinTranscript(transcriptPath) {
+  const records = citesteTranscriptJsonl(transcriptPath);
+  let titlu = "";
+  for (const record of records) {
+    if (record?.type === "custom-title" && typeof record.customTitle === "string" && record.customTitle.trim()) {
+      titlu = record.customTitle.trim();
+    } else if (record?.type === "ai-title" && typeof record.aiTitle === "string" && record.aiTitle.trim()) {
+      titlu = record.aiTitle.trim();
+    }
+  }
+  return titlu;
+}
+
+export function citesteUltimulPromptUserDinTranscript(transcriptPath) {
+  const records = citesteTranscriptJsonl(transcriptPath);
+  for (let i = records.length - 1; i >= 0; i -= 1) {
+    const record = records[i];
+    if (record?.role === "user") {
+      const text = continutMesajCaText(record.content);
+      if (text.trim()) return text.trim();
+    }
+    if (record?.message?.role === "user") {
+      const text = continutMesajCaText(record.message.content);
+      if (text.trim()) return text.trim();
+    }
+    if (record?.type === "user") {
+      const text = continutMesajCaText(record.message?.content ?? record.content);
+      if (text.trim()) return text.trim();
+    }
+  }
+  return "";
 }
 
 function ruleazaGit(args, { cwd = null } = {}) {
@@ -171,41 +232,48 @@ function commitSiPushLoguri(localRepoPath, mesajCommit) {
   }
 }
 
+function normalizeazaGarduriHuman(humanGarduri, fallback) {
+  if (Array.isArray(humanGarduri) && humanGarduri.length > 0) {
+    return humanGarduri.map((gard) => ({
+      folder: textSauNimic(gard?.folder),
+      actiuni: Array.isArray(gard?.actiuni) && gard.actiuni.length
+        ? gard.actiuni.map((x) => String(x))
+        : ["Nu a detectat nimic de facut."],
+    }));
+  }
+  return [{
+    folder: textSauNimic(fallback.folderHookRepo),
+    actiuni: [textSauNimic(fallback.activitate)],
+  }];
+}
+
 function construiesteBlocHuman({
-  sessionId,
-  hookEvent,
+  chatTitle,
+  promptText,
+  humanGarduri,
   folderHookRepo,
   activitate,
-  ccn,
-  additionalContext,
-  permissionDecision,
   now,
 }) {
+  const garduri = normalizeazaGarduriHuman(humanGarduri, { folderHookRepo, activitate });
   const linii = [
-    "============================================================",
+    "=======================================",
     `DATA_ORA: ${dataOraBucuresti(now)}`,
-    `GARD: ${folderHookRepo}`,
-    `HOOK: ${hookEvent}`,
-    `A_FACUT: ${activitate}`,
+    `TITLU_CHAT: ${chatTitle || "(titlu indisponibil din transcript)"}`,
+    "PROMPT_TRIMIS_LUI_CLAUDE_BEGIN",
+    promptText || "(prompt indisponibil pentru acest hook)",
+    "PROMPT_TRIMIS_LUI_CLAUDE_END",
+    "",
   ];
 
-  if (permissionDecision) {
-    linii.push(`DECIZIE: ${permissionDecision}`);
+  for (const gard of garduri) {
+    linii.push(gard.folder);
+    for (const actiune of gard.actiuni) {
+      linii.push(actiune);
+    }
+    linii.push("");
   }
 
-  if (ccn) {
-    linii.push(`CCN: ${ccn}`);
-  }
-
-  if (additionalContext) {
-    linii.push(
-      "",
-      "CE_A_TRIMIS_LUI_CLAUDE:",
-      additionalContext,
-    );
-  }
-
-  linii.push(`SESIUNE: ${sessionId}`, "");
   return linii.join("\n");
 }
 
@@ -223,6 +291,9 @@ function construiesteBlocTehnic({
   repositoryRoot,
   toolName,
   targetPath,
+  transcriptPath,
+  chatTitle,
+  promptText,
   rootLog,
   remoteUrl,
   now,
@@ -239,6 +310,11 @@ function construiesteBlocTehnic({
     `HOOK_EVENT: ${hookEvent}`,
     `FOLDER_GARD_REPO: ${folderHookRepo}`,
     `ACTIVITATE: ${activitate}`,
+    `TITLU_CHAT: ${chatTitle || "(indisponibil)"}`,
+    "USER_PROMPT_BEGIN",
+    textSauNimic(promptText),
+    "USER_PROMPT_END",
+    `TRANSCRIPT_PATH: ${textSauNimic(transcriptPath)}`,
     `PERMISSION_DECISION: ${textSauNimic(permissionDecision)}`,
     `TOOL_NAME: ${textSauNimic(toolName)}`,
     `TARGET_PATH: ${textSauNimic(targetPath)}`,
@@ -300,6 +376,10 @@ export function scrieLogActivitateHook({
   repositoryRoot = "",
   toolName = "",
   targetPath = "",
+  transcriptPath = "",
+  promptText = "",
+  chatTitle = "",
+  humanGarduri = null,
   now = new Date(),
   localRepoPath = null,
   remoteUrl = URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
@@ -308,14 +388,15 @@ export function scrieLogActivitateHook({
   asiguraRepositoryLogLocal({ localRepoPath: rootLog, remoteUrl });
   sincronizeazaInainteDeScriere(rootLog);
 
+  const titluEfectiv = chatTitle || citesteTitluChatDinTranscript(transcriptPath);
+  const promptEfectiv = promptText || citesteUltimulPromptUserDinTranscript(transcriptPath);
+
   const blocHuman = construiesteBlocHuman({
-    sessionId,
-    hookEvent,
+    chatTitle: titluEfectiv,
+    promptText: promptEfectiv,
+    humanGarduri,
     folderHookRepo,
     activitate,
-    ccn,
-    additionalContext,
-    permissionDecision,
     now,
   });
 
@@ -333,6 +414,9 @@ export function scrieLogActivitateHook({
     repositoryRoot,
     toolName,
     targetPath,
+    transcriptPath,
+    chatTitle: titluEfectiv,
+    promptText: promptEfectiv,
     rootLog,
     remoteUrl,
     now,
