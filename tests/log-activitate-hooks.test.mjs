@@ -5,6 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import {
   caleRepositoryLogLocal,
+  citesteTitluChatDinTranscript,
+  citesteUltimulPromptUserDinTranscript,
   NUME_FISIER_LOG_HUMAN_READABLE,
   NUME_FISIER_LOG_TEHNIC,
   scrieLogActivitateHook,
@@ -23,7 +25,22 @@ assert.match(
   /yl-claude-garduri[\\/]repo-log-hooks[\\/]abc_def$/,
 );
 
-const dir = mkdtempSync(path.join(os.tmpdir(), "yl-hook-log-dublu-test-"));
+const dir = mkdtempSync(path.join(os.tmpdir(), "yl-hook-log-human-ordonat-test-"));
+const transcriptPath = path.join(dir, "transcript.jsonl");
+writeFileSync(
+  transcriptPath,
+  [
+    JSON.stringify({ type: "ai-title", aiTitle: "Titlu AI initial" }),
+    JSON.stringify({ type: "user", message: { role: "user", content: "primul prompt" } }),
+    JSON.stringify({ type: "custom-title", customTitle: "Titlu chat test" }),
+    JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: "prompt curent din transcript" }] } }),
+  ].join("\n") + "\n",
+  "utf8",
+);
+
+assert.equal(citesteTitluChatDinTranscript(transcriptPath), "Titlu chat test");
+assert.equal(citesteUltimulPromptUserDinTranscript(transcriptPath), "prompt curent din transcript");
+
 const sursa = path.join(dir, "sursa");
 const remoteBare = path.join(dir, "remote.git");
 const clonaLogger = path.join(dir, "clona-logger");
@@ -42,11 +59,32 @@ git(["clone", "--bare", sursa, remoteBare]);
 const rezultat1 = scrieLogActivitateHook({
   sessionId: "sesiune-git-test",
   hookEvent: "UserPromptSubmit",
-  folderHookRepo: "Hook UserPromptSubmit - test",
-  activitate: "a inserat un reminder",
-  ccn: "Hook UserPromptSubmit - test a facut inserarea reminderului.",
+  folderHookRepo: "Hook updater + Hook reminder",
+  activitate: "a rulat updaterul si reminderul",
+  ccn: "CCN tehnic combinat",
   additionalContext: "REMINDER EXACT PENTRU CLAUDE",
   repositoryRoot: "/home/user/yl",
+  transcriptPath,
+  promptText: "promptul trimis acum",
+  humanGarduri: [
+    {
+      folder: "Hook UserPromptSubmit - cand trimit prompt update all garduri din github",
+      actiuni: [
+        "Nu a detectat nimic de actualizat.",
+        "A inserat in CCN:",
+        "Hook updater a facut verificarea.",
+      ],
+    },
+    {
+      folder: "Hook UserPromptSubmit - cand trimit prompt insereaza reminder",
+      actiuni: [
+        "A inserat in CCN:",
+        "Hook reminder a facut inserarea reminderelor: 1.",
+        "A inserat in additional context:",
+        "REMINDER EXACT PENTRU CLAUDE",
+      ],
+    },
+  ],
   alteActivitati: "trigger: CP\nremindere: 1",
   localRepoPath: clonaLogger,
   remoteUrl: remoteBare,
@@ -69,10 +107,20 @@ scrieLogActivitateHook({
   activitate: "a blocat apelul Write pentru /home/user/yl/protejat.txt",
   ccn: "Hook PreToolUse - test a facut blocarea.",
   permissionDecision: "deny",
-  permissionDecisionReason: "motiv deny exact",
+  permissionDecisionReason: "In plan ai convenit sa nu modifici acest fisier.",
   toolName: "Write",
   targetPath: "/home/user/yl/protejat.txt",
   repositoryRoot: "/home/user/yl",
+  transcriptPath,
+  humanGarduri: [
+    {
+      folder: "Hook PreToolUse - test",
+      actiuni: [
+        "A blocat activarea uneltei Write pentru /home/user/yl/protejat.txt.",
+        "Motiv: In plan ai convenit sa nu modifici acest fisier.",
+      ],
+    },
+  ],
   alteActivitati: "lista protectie: activa",
   localRepoPath: clonaLogger,
   remoteUrl: remoteBare,
@@ -85,12 +133,25 @@ const human = git([
 ]);
 
 assert.match(human, /LOG HUMAN READABLE/);
-assert.match(human, /A_FACUT: a inserat un reminder/);
-assert.match(human, /CE_A_TRIMIS_LUI_CLAUDE:\nREMINDER EXACT PENTRU CLAUDE/);
-assert.match(human, /DECIZIE: deny/);
-assert.match(human, /A_FACUT: a blocat apelul Write/);
+assert.match(human, /=======================================/);
+assert.match(human, /DATA_ORA: 2026\.09\.18-11\.00\.00 Europe\/Bucharest/);
+assert.match(human, /TITLU_CHAT: Titlu chat test/);
+assert.match(human, /PROMPT_TRIMIS_LUI_CLAUDE_BEGIN\npromptul trimis acum\nPROMPT_TRIMIS_LUI_CLAUDE_END/);
+assert.match(
+  human,
+  /Hook UserPromptSubmit - cand trimit prompt update all garduri din github\nNu a detectat nimic de actualizat\./,
+);
+assert.match(
+  human,
+  /Hook UserPromptSubmit - cand trimit prompt insereaza reminder[\s\S]*A inserat in additional context:\nREMINDER EXACT PENTRU CLAUDE/,
+);
+assert.match(
+  human,
+  /PROMPT_TRIMIS_LUI_CLAUDE_BEGIN\nprompt curent din transcript\nPROMPT_TRIMIS_LUI_CLAUDE_END[\s\S]*Hook PreToolUse - test\nA blocat activarea uneltei Write/,
+);
+assert.doesNotMatch(human, /GARD: Hook updater \+ Hook reminder/);
 assert.doesNotMatch(human, /NODE_VERSION:/);
-assert.doesNotMatch(human, /motiv deny exact/);
+assert.doesNotMatch(human, /PERMISSION_DECISION_REASON_BEGIN/);
 
 const tehnic = git([
   "--git-dir", remoteBare,
@@ -99,7 +160,10 @@ const tehnic = git([
 
 assert.match(tehnic, /LOG TEHNIC/);
 assert.match(tehnic, /SECTIUNE_COMUNA_BEGIN/);
-assert.match(tehnic, /LOG_SCHEMA_VERSION: 2/);
+assert.match(tehnic, /LOG_SCHEMA_VERSION: 3/);
+assert.match(tehnic, /TITLU_CHAT: Titlu chat test/);
+assert.match(tehnic, /USER_PROMPT_BEGIN\npromptul trimis acum\nUSER_PROMPT_END/);
+assert.match(tehnic, /TRANSCRIPT_PATH:/);
 assert.match(tehnic, /DATA_ORA: 2026\.09\.18-11\.01\.00 Europe\/Bucharest/);
 assert.match(tehnic, /SESIUNE: sesiune-git-test/);
 assert.match(tehnic, /HOOK_EVENT: PreToolUse/);
@@ -117,7 +181,10 @@ assert.match(tehnic, /LOG_REPOSITORY_REMOTE:/);
 assert.match(tehnic, /LOG_REPOSITORY_LOCAL:/);
 assert.match(tehnic, /CANALE_CATRE_CLAUDE_BEGIN/);
 assert.match(tehnic, /ADDITIONAL_CONTEXT_BEGIN\nREMINDER EXACT PENTRU CLAUDE\nADDITIONAL_CONTEXT_END/);
-assert.match(tehnic, /PERMISSION_DECISION_REASON_BEGIN\nmotiv deny exact\nPERMISSION_DECISION_REASON_END/);
+assert.match(
+  tehnic,
+  /PERMISSION_DECISION_REASON_BEGIN\nIn plan ai convenit sa nu modifici acest fisier\.\nPERMISSION_DECISION_REASON_END/,
+);
 assert.match(tehnic, /DETALII_SPECIFICE_GARDULUI_BEGIN\nlista protectie: activa\nDETALII_SPECIFICE_GARDULUI_END/);
 
 const nrCommituri = Number(git([
@@ -126,4 +193,4 @@ const nrCommituri = Number(git([
 ]));
 assert.equal(nrCommituri, 3);
 
-console.log("LOGGING DUBLU + SECTIUNE TEHNICA COMUNA + PUSH TEST OK");
+console.log("LOG HUMAN PE PROMPT + GARDURI SEPARATE + LOG TEHNIC V3 TEST OK");
