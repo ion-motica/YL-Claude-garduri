@@ -220,6 +220,9 @@ async function main() {
         hookEvent: "PreToolUse",
         repositoryRoot: input?.cwd,
         folderHookRepo: FOLDER_HOOK,
+        toolName: input?.tool_name || "",
+        targetPath: target,
+        permissionDecision: decision,
         activitate: decision === "deny"
           ? `a blocat apelul ${input?.tool_name || "tool"} pentru ${target}`
           : `a permis continuarea apelului ${input?.tool_name || "tool"} pentru ${target}`,
