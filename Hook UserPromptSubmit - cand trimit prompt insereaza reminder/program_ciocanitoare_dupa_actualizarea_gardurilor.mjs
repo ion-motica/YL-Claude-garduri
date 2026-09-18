@@ -284,6 +284,7 @@ try {
     transcriptPath: input?.transcript_path || "",
     promptText: promptCurentPentruLog,
     sessionId: input?.session_id,
+    promptId: input?.prompt_id,
     hookEvent: "UserPromptSubmit",
     folderHookRepo: `${FOLDER_UPDATE} + ${FOLDER_REMINDER}`,
     activitate: "a verificat/actualizat gardurile, a generat/verificat listele de editare si a selectat reminderele",

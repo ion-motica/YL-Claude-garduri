@@ -228,6 +228,7 @@ async function main() {
 
       scrieLogActivitateHook({
         sessionId: input?.session_id,
+        promptId: input?.prompt_id,
         hookEvent: "PreToolUse",
         repositoryRoot: input?.cwd,
         transcriptPath: input?.transcript_path || "",

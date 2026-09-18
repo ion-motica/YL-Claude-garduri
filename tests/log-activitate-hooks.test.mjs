@@ -7,6 +7,7 @@ import {
   caleRepositoryLogLocal,
   citesteTitluChatDinTranscript,
   citesteUltimulPromptUserDinTranscript,
+  memoreazaTitluSesiune,
   NUME_FISIER_LOG_HUMAN_READABLE,
   NUME_FISIER_LOG_TEHNIC,
   scrieLogActivitateHook,
@@ -41,9 +42,18 @@ writeFileSync(
 assert.equal(citesteTitluChatDinTranscript(transcriptPath), "Titlu chat test");
 assert.equal(citesteUltimulPromptUserDinTranscript(transcriptPath), "prompt curent din transcript");
 
+const transcriptIntarziatPath = path.join(dir, "transcript-intarziat.jsonl");
+writeFileSync(
+  transcriptIntarziatPath,
+  `${JSON.stringify({ type: "user", message: { role: "user", content: "PROMPT VECHI DIN TRANSCRIPT" } })}\n`,
+  "utf8",
+);
+
 const sursa = path.join(dir, "sursa");
 const remoteBare = path.join(dir, "remote.git");
 const clonaLogger = path.join(dir, "clona-logger");
+const sessionId = `sesiune-git-test-${process.pid}-${Date.now()}`;
+const promptId = "prompt-id-corect-001";
 
 mkdirSync(sursa, { recursive: true });
 git(["init", "-b", "main"], sursa);
@@ -56,15 +66,21 @@ git([
 ], sursa);
 git(["clone", "--bare", sursa, remoteBare]);
 
+assert.equal(memoreazaTitluSesiune({
+  sessionId,
+  sessionTitle: "Titlu capturat la SessionStart",
+}), true);
+
 const rezultat1 = scrieLogActivitateHook({
-  sessionId: "sesiune-git-test",
+  sessionId,
+  promptId,
   hookEvent: "UserPromptSubmit",
   folderHookRepo: "Hook updater + Hook reminder",
   activitate: "a rulat updaterul si reminderul",
   ccn: "CCN tehnic combinat",
   additionalContext: "REMINDER EXACT PENTRU CLAUDE",
   repositoryRoot: "/home/user/yl",
-  transcriptPath,
+  transcriptPath: transcriptIntarziatPath,
   promptText: "promptul trimis acum",
   humanGarduri: [
     {
@@ -101,7 +117,8 @@ assert.equal(
 );
 
 scrieLogActivitateHook({
-  sessionId: "sesiune-git-test",
+  sessionId,
+  promptId,
   hookEvent: "PreToolUse",
   folderHookRepo: "Hook PreToolUse - test",
   activitate: "a blocat apelul Write pentru /home/user/yl/protejat.txt",
@@ -111,7 +128,7 @@ scrieLogActivitateHook({
   toolName: "Write",
   targetPath: "/home/user/yl/protejat.txt",
   repositoryRoot: "/home/user/yl",
-  transcriptPath,
+  transcriptPath: transcriptIntarziatPath,
   humanGarduri: [
     {
       folder: "Hook PreToolUse - test",
@@ -135,11 +152,16 @@ const human = git([
 assert.match(human, /LOG HUMAN READABLE/);
 assert.match(human, /=======================================/);
 assert.match(human, /DATA_ORA: 2026\.09\.18-11\.00\.00 Europe\/Bucharest/);
-assert.match(human, /TITLU_CHAT: Titlu chat test/);
-assert.match(human, /PROMPT_TRIMIS_LUI_CLAUDE_BEGIN\npromptul trimis acum\nPROMPT_TRIMIS_LUI_CLAUDE_END/);
+assert.doesNotMatch(human, /DATA_ORA: 2026\.09\.18-11\.01\.00 Europe\/Bucharest/);
+assert.equal((human.match(/DATA_ORA:/g) || []).length, 1);
+assert.match(human, /TITLU_CHAT: Titlu capturat la SessionStart/);
+assert.match(human, /PROMPT_SCRIS_DE_USER_BEGIN\npromptul trimis acum\nPROMPT_SCRIS_DE_USER_END/);
+assert.doesNotMatch(human, /PROMPT VECHI DIN TRANSCRIPT/);
+assert.equal((human.match(/PROMPT_SCRIS_DE_USER_BEGIN/g) || []).length, 1);
+assert.equal((human.match(/\+{16}/g) || []).length, 3);
 assert.match(
   human,
-  /Hook UserPromptSubmit - cand trimit prompt update all garduri din github\nNu a detectat nimic de actualizat\./,
+  /\+{16}\nHook UserPromptSubmit - cand trimit prompt update all garduri din github\nNu a detectat nimic de actualizat\./,
 );
 assert.match(
   human,
@@ -147,7 +169,7 @@ assert.match(
 );
 assert.match(
   human,
-  /PROMPT_TRIMIS_LUI_CLAUDE_BEGIN\nprompt curent din transcript\nPROMPT_TRIMIS_LUI_CLAUDE_END[\s\S]*Hook PreToolUse - test\nA blocat activarea uneltei Write/,
+  /PROMPT_SCRIS_DE_USER_BEGIN\npromptul trimis acum\nPROMPT_SCRIS_DE_USER_END[\s\S]*\+{16}\nHook PreToolUse - test\nA blocat activarea uneltei Write/,
 );
 assert.doesNotMatch(human, /GARD: Hook updater \+ Hook reminder/);
 assert.doesNotMatch(human, /NODE_VERSION:/);
@@ -160,12 +182,15 @@ const tehnic = git([
 
 assert.match(tehnic, /LOG TEHNIC/);
 assert.match(tehnic, /SECTIUNE_COMUNA_BEGIN/);
-assert.match(tehnic, /LOG_SCHEMA_VERSION: 3/);
-assert.match(tehnic, /TITLU_CHAT: Titlu chat test/);
+assert.match(tehnic, /LOG_SCHEMA_VERSION: 4/);
+assert.match(tehnic, /TITLU_CHAT: Titlu capturat la SessionStart/);
 assert.match(tehnic, /USER_PROMPT_BEGIN\npromptul trimis acum\nUSER_PROMPT_END/);
+assert.doesNotMatch(tehnic, /PROMPT VECHI DIN TRANSCRIPT/);
+assert.equal((tehnic.match(/USER_PROMPT_BEGIN\npromptul trimis acum\nUSER_PROMPT_END/g) || []).length, 2);
 assert.match(tehnic, /TRANSCRIPT_PATH:/);
 assert.match(tehnic, /DATA_ORA: 2026\.09\.18-11\.01\.00 Europe\/Bucharest/);
-assert.match(tehnic, /SESIUNE: sesiune-git-test/);
+assert.match(tehnic, new RegExp(`SESIUNE: ${sessionId}`));
+assert.match(tehnic, /PROMPT_ID: prompt-id-corect-001/);
 assert.match(tehnic, /HOOK_EVENT: PreToolUse/);
 assert.match(tehnic, /FOLDER_GARD_REPO: Hook PreToolUse - test/);
 assert.match(tehnic, /PERMISSION_DECISION: deny/);
@@ -193,4 +218,4 @@ const nrCommituri = Number(git([
 ]));
 assert.equal(nrCommituri, 3);
 
-console.log("LOG HUMAN PE PROMPT + GARDURI SEPARATE + LOG TEHNIC V3 TEST OK");
+console.log("LOG HUMAN PE PROMPT + GARDURI SEPARATE + LOG TEHNIC V4 TEST OK");
