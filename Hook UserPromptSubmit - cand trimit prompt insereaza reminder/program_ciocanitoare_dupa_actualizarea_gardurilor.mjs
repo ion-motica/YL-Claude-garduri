@@ -20,6 +20,7 @@ import {
   memoreazaTitluChatDeclaratDeUser,
   scrieLogActivitateHook,
 } from "../shared/program_scrie_log_activitate_hooks.mjs";
+import { formatAvertizareSesiuneNoua } from "../shared/claude-notice.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -94,6 +95,8 @@ function citesteStatusActualizarePlugin() {
       hookuriNoi: [],
       skilluriNoi: [],
       barzauniNoi: [],
+      sesiuneNouaNecesara: false,
+      motiveSesiuneNoua: [],
       reloadNecesar: false,
       motiveReload: [],
     };
@@ -110,6 +113,8 @@ function citesteStatusActualizarePlugin() {
       hookuriNoi: [],
       skilluriNoi: [],
       barzauniNoi: [],
+      sesiuneNouaNecesara: false,
+      motiveSesiuneNoua: [],
       reloadNecesar: false,
       motiveReload: [],
     };
@@ -208,15 +213,8 @@ injectate in additionalContext. Claude nu afla preventiv din UserPromptSubmit
 ce fisiere sunt protejate; primul semnal despre un blocaj vine din PreToolUse.
 */
 
-if (statusActualizare?.reloadNecesar) {
-  contextParts.push([
-    "ANUNTA UTILIZATORUL CA:",
-    "Actualizarea YL-Claude-garduri a detectat componente structurale noi/modificate.",
-    "In Claude Code Web este necesara o SESIUNE/CHAT NOU pentru activarea sigura a acelor componente.",
-    "Nu pretinde ca noile hookuri/skills/componente sunt active in sesiunea curenta.",
-    statusActualizare.motiveReload?.length ? `Motive: ${statusActualizare.motiveReload.join(" ; ")}` : "",
-  ].filter(Boolean).join("\n"));
-}
+const avertizareSesiuneNoua = formatAvertizareSesiuneNoua(statusActualizare);
+if (avertizareSesiuneNoua) contextParts.push(avertizareSesiuneNoua);
 
 if (["verificare_remote_esuat", "fetch_esuat", "remote_invalid", "comparare_esuat", "actualizare_esuat"].includes(statusActualizare?.status)) {
   contextParts.push([
