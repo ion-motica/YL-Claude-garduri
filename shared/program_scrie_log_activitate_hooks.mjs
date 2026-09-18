@@ -1,13 +1,22 @@
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 export const NUME_FISIER_LOG_ACTIVITATE_HOOKS = "log activitate hooks.txt";
-export const CALE_LOG_ACTIVITATE_HOOKS = path.join(
-  os.tmpdir(),
-  "yl-claude-garduri",
-  NUME_FISIER_LOG_ACTIVITATE_HOOKS,
-);
+export const NUME_FOLDER_LOG_ACTIVITATE_HOOKS = "1 Hook Tests";
+
+export function caleLogActivitateHooksDinRepository(repositoryRoot = process.cwd()) {
+  const root = typeof repositoryRoot === "string" && repositoryRoot.trim()
+    ? path.resolve(repositoryRoot)
+    : process.cwd();
+
+  return path.join(
+    root,
+    NUME_FOLDER_LOG_ACTIVITATE_HOOKS,
+    NUME_FISIER_LOG_ACTIVITATE_HOOKS,
+  );
+}
+
+export const CALE_LOG_ACTIVITATE_HOOKS = caleLogActivitateHooksDinRepository();
 
 const HEADER = `LOG ACTIVITATE HOOKS - YL-Claude-garduri
 
@@ -22,8 +31,9 @@ Fiecare hook trebuie sa inregistreze aici, cu randuri normale:
 CCN ramane foarte scurt: "<nume folder hook in repo> a facut X."
 Detaliile tehnice si de audit stau in acest log, nu in CCN.
 
-Acest fisier este runtime si este tinut in afara checkout-ului pluginului,
-ca scrierea logului sa nu murdareasca repository-ul folosit de updater.
+Acest fisier este runtime si este tinut in repository-ul de lucru,
+in folderul "1 Hook Tests". Fisierul trebuie ignorat de Git,
+ca logarea sa nu murdareasca working tree-ul si sa nu intre in commituri.
 
 `;
 
@@ -61,11 +71,14 @@ export function scrieLogActivitateHook({
   alteMesajeCatreClaude = "",
   alteActivitati = "",
   now = new Date(),
-  filePath = CALE_LOG_ACTIVITATE_HOOKS,
+  repositoryRoot = process.cwd(),
+  filePath = null,
 } = {}) {
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  if (!existsSync(filePath)) {
-    writeFileSync(filePath, HEADER, "utf8");
+  const caleEfectiva = filePath || caleLogActivitateHooksDinRepository(repositoryRoot);
+
+  mkdirSync(path.dirname(caleEfectiva), { recursive: true });
+  if (!existsSync(caleEfectiva)) {
+    writeFileSync(caleEfectiva, HEADER, "utf8");
   }
 
   const bloc = [
@@ -94,6 +107,6 @@ export function scrieLogActivitateHook({
     "",
   ].join("\n");
 
-  appendFileSync(filePath, `${bloc}\n`, "utf8");
-  return filePath;
+  appendFileSync(caleEfectiva, `${bloc}\n`, "utf8");
+  return caleEfectiva;
 }
