@@ -2,12 +2,19 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-export const NUME_FISIER_LOG_ACTIVITATE_HOOKS = "log activitate hooks.txt";
+export const NUME_FISIER_LOG_HUMAN_READABLE = "log human readable.txt";
+export const NUME_FISIER_LOG_TEHNIC = "log tehnic.txt";
 export const REPOSITORY_LOG_ACTIVITATE_HOOKS =
   "ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude";
 export const URL_REPOSITORY_LOG_ACTIVITATE_HOOKS =
   `https://github.com/${REPOSITORY_LOG_ACTIVITATE_HOOKS}.git`;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT_PLUGIN = path.resolve(__dirname, "..");
+const LOG_SCHEMA_VERSION = "2";
 
 function idSigur(value) {
   return String(value || "fara-sesiune").replace(/[^A-Za-z0-9._-]/g, "_");
@@ -22,30 +29,31 @@ export function caleRepositoryLogLocal(sessionId = "fara-sesiune") {
   );
 }
 
+// Compatibilitate pentru mesajele de eroare din hookuri.
 export const CALE_LOG_ACTIVITATE_HOOKS = path.join(
   caleRepositoryLogLocal(),
-  NUME_FISIER_LOG_ACTIVITATE_HOOKS,
+  NUME_FISIER_LOG_TEHNIC,
 );
 
-const HEADER = `LOG ACTIVITATE HOOKS - YL-Claude-garduri
+const HEADER_HUMAN = `LOG HUMAN READABLE - YL-Claude-garduri
 
-REGULA:
-Fiecare hook trebuie sa inregistreze aici, cu randuri normale:
-- ce a facut;
-- textul exact trimis in CCN / systemMessage;
-- textul exact trimis in additionalContext;
-- permissionDecisionReason, cand exista;
-- orice alt mesaj trimis lui Claude;
-- alte activitati relevante facute de hook.
+Scop: jurnal scurt si usor de citit despre ce a facut fiecare gard.
+Un gard = hook Claude Code + programul nostru declansat de acel hook.
 
-CCN ramane foarte scurt: "<nume folder hook in repo> a facut X."
-Detaliile tehnice si de audit stau in acest log, nu in CCN.
+Pentru diagnostic complet vezi "log tehnic.txt".
 
-Acest fisier este persistent in repository-ul separat:
-${REPOSITORY_LOG_ACTIVITATE_HOOKS}
+`;
 
-Toate hookurile folosesc acelasi helper comun de logging.
-Helperul sincronizeaza fiecare intrare prin git commit + push.
+const HEADER_TEHNIC = `LOG TEHNIC - YL-Claude-garduri
+
+Scop: diagnostic complet pentru toate gardurile.
+Fiecare intrare are:
+1. SECTIUNE_COMUNA - aceleasi campuri pentru toate gardurile;
+2. CANALE_CATRE_CLAUDE - textele exacte trimise lui Claude;
+3. DETALII_SPECIFICE_GARDULUI - date suplimentare furnizate de gardul concret.
+
+Schema log tehnic: v${LOG_SCHEMA_VERSION}
+Repository persistent: ${REPOSITORY_LOG_ACTIVITATE_HOOKS}
 
 `;
 
@@ -79,6 +87,15 @@ function ruleazaGit(args, { cwd = null } = {}) {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
+}
+
+function gitSauNecunoscut(args, cwd = null) {
+  try {
+    const out = ruleazaGit(args, { cwd });
+    return out || "(gol)";
+  } catch {
+    return "(necunoscut)";
+  }
 }
 
 function esteRepositoryGit(root) {
@@ -117,11 +134,16 @@ function sincronizeazaInainteDeScriere(localRepoPath) {
   ruleazaGit(["-C", localRepoPath, "pull", "--rebase", "origin", "main"]);
 }
 
-function commitSiPushLog(localRepoPath, mesajCommit) {
+function commitSiPushLoguri(localRepoPath, mesajCommit) {
+  const fisiere = [
+    NUME_FISIER_LOG_HUMAN_READABLE,
+    NUME_FISIER_LOG_TEHNIC,
+  ];
+
   const stare = ruleazaGit([
     "-C", localRepoPath,
     "status", "--porcelain",
-    "--", NUME_FISIER_LOG_ACTIVITATE_HOOKS,
+    "--", ...fisiere,
   ]);
 
   if (!stare) return;
@@ -129,7 +151,7 @@ function commitSiPushLog(localRepoPath, mesajCommit) {
   ruleazaGit([
     "-C", localRepoPath,
     "add", "--",
-    NUME_FISIER_LOG_ACTIVITATE_HOOKS,
+    ...fisiere,
   ]);
 
   ruleazaGit([
@@ -138,7 +160,7 @@ function commitSiPushLog(localRepoPath, mesajCommit) {
     "-c", "user.email=yl-claude-garduri-logger@users.noreply.github.com",
     "commit",
     "-m", mesajCommit,
-    "--", NUME_FISIER_LOG_ACTIVITATE_HOOKS,
+    "--", ...fisiere,
   ]);
 
   try {
@@ -149,26 +171,89 @@ function commitSiPushLog(localRepoPath, mesajCommit) {
   }
 }
 
-function construiesteBlocLog({
+function construiesteBlocHuman({
   sessionId,
   hookEvent,
   folderHookRepo,
   activitate,
   ccn,
   additionalContext,
+  permissionDecision,
+  now,
+}) {
+  const linii = [
+    "============================================================",
+    `DATA_ORA: ${dataOraBucuresti(now)}`,
+    `GARD: ${folderHookRepo}`,
+    `HOOK: ${hookEvent}`,
+    `A_FACUT: ${activitate}`,
+  ];
+
+  if (permissionDecision) {
+    linii.push(`DECIZIE: ${permissionDecision}`);
+  }
+
+  if (ccn) {
+    linii.push(`CCN: ${ccn}`);
+  }
+
+  if (additionalContext) {
+    linii.push(
+      "",
+      "CE_A_TRIMIS_LUI_CLAUDE:",
+      additionalContext,
+    );
+  }
+
+  linii.push(`SESIUNE: ${sessionId}`, "");
+  return linii.join("\n");
+}
+
+function construiesteBlocTehnic({
+  sessionId,
+  hookEvent,
+  folderHookRepo,
+  activitate,
+  ccn,
+  additionalContext,
+  permissionDecision,
   permissionDecisionReason,
   alteMesajeCatreClaude,
   alteActivitati,
+  repositoryRoot,
+  toolName,
+  targetPath,
+  rootLog,
+  remoteUrl,
   now,
 }) {
+  const pluginCommit = gitSauNecunoscut(["-C", ROOT_PLUGIN, "rev-parse", "HEAD"]);
+  const logRepoCommitInainte = gitSauNecunoscut(["-C", rootLog, "rev-parse", "HEAD"]);
+
   return [
     "============================================================",
+    "SECTIUNE_COMUNA_BEGIN",
+    `LOG_SCHEMA_VERSION: ${LOG_SCHEMA_VERSION}`,
     `DATA_ORA: ${dataOraBucuresti(now)}`,
     `SESIUNE: ${sessionId}`,
     `HOOK_EVENT: ${hookEvent}`,
-    `FOLDER_HOOK_REPO: ${folderHookRepo}`,
+    `FOLDER_GARD_REPO: ${folderHookRepo}`,
     `ACTIVITATE: ${activitate}`,
+    `PERMISSION_DECISION: ${textSauNimic(permissionDecision)}`,
+    `TOOL_NAME: ${textSauNimic(toolName)}`,
+    `TARGET_PATH: ${textSauNimic(targetPath)}`,
+    `REPOSITORY_ROOT_PRIMIT: ${textSauNimic(repositoryRoot)}`,
+    `PROCESS_CWD: ${process.cwd()}`,
+    `PLUGIN_RUNTIME_ROOT: ${ROOT_PLUGIN}`,
+    `PLUGIN_RUNTIME_COMMIT: ${pluginCommit}`,
+    `NODE_VERSION: ${process.version}`,
+    `PLATFORM_ARCH: ${process.platform}/${process.arch}`,
+    `LOG_REPOSITORY_REMOTE: ${remoteUrl}`,
+    `LOG_REPOSITORY_LOCAL: ${rootLog}`,
+    `LOG_REPOSITORY_COMMIT_INAINTE_DE_INTRARE: ${logRepoCommitInainte}`,
+    "SECTIUNE_COMUNA_END",
     "",
+    "CANALE_CATRE_CLAUDE_BEGIN",
     "CCN_BEGIN",
     textSauNimic(ccn),
     "CCN_END",
@@ -184,18 +269,19 @@ function construiesteBlocLog({
     "ALTE_MESAJE_CATRE_CLAUDE_BEGIN",
     textSauNimic(alteMesajeCatreClaude),
     "ALTE_MESAJE_CATRE_CLAUDE_END",
+    "CANALE_CATRE_CLAUDE_END",
     "",
-    "ALTE_ACTIVITATI_BEGIN",
+    "DETALII_SPECIFICE_GARDULUI_BEGIN",
     textSauNimic(alteActivitati),
-    "ALTE_ACTIVITATI_END",
+    "DETALII_SPECIFICE_GARDULUI_END",
     "",
   ].join("\n");
 }
 
-function scrieBlocInFisier(caleEfectiva, bloc) {
+function scrieBlocInFisier(caleEfectiva, header, bloc) {
   mkdirSync(path.dirname(caleEfectiva), { recursive: true });
   if (!existsSync(caleEfectiva)) {
-    writeFileSync(caleEfectiva, HEADER, "utf8");
+    writeFileSync(caleEfectiva, header, "utf8");
   }
   appendFileSync(caleEfectiva, `${bloc}\n`, "utf8");
 }
@@ -207,41 +293,62 @@ export function scrieLogActivitateHook({
   activitate = "necunoscuta",
   ccn = "",
   additionalContext = "",
+  permissionDecision = "",
   permissionDecisionReason = "",
   alteMesajeCatreClaude = "",
   alteActivitati = "",
+  repositoryRoot = "",
+  toolName = "",
+  targetPath = "",
   now = new Date(),
-  filePath = null,
   localRepoPath = null,
   remoteUrl = URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
 } = {}) {
-  const bloc = construiesteBlocLog({
+  const rootLog = localRepoPath || caleRepositoryLogLocal(sessionId);
+  asiguraRepositoryLogLocal({ localRepoPath: rootLog, remoteUrl });
+  sincronizeazaInainteDeScriere(rootLog);
+
+  const blocHuman = construiesteBlocHuman({
     sessionId,
     hookEvent,
     folderHookRepo,
     activitate,
     ccn,
     additionalContext,
-    permissionDecisionReason,
-    alteMesajeCatreClaude,
-    alteActivitati,
+    permissionDecision,
     now,
   });
 
-  if (filePath) {
-    scrieBlocInFisier(filePath, bloc);
-    return filePath;
-  }
+  const blocTehnic = construiesteBlocTehnic({
+    sessionId,
+    hookEvent,
+    folderHookRepo,
+    activitate,
+    ccn,
+    additionalContext,
+    permissionDecision,
+    permissionDecisionReason,
+    alteMesajeCatreClaude,
+    alteActivitati,
+    repositoryRoot,
+    toolName,
+    targetPath,
+    rootLog,
+    remoteUrl,
+    now,
+  });
 
-  const rootLog = localRepoPath || caleRepositoryLogLocal(sessionId);
-  asiguraRepositoryLogLocal({ localRepoPath: rootLog, remoteUrl });
-  sincronizeazaInainteDeScriere(rootLog);
+  const caleHuman = path.join(rootLog, NUME_FISIER_LOG_HUMAN_READABLE);
+  const caleTehnic = path.join(rootLog, NUME_FISIER_LOG_TEHNIC);
 
-  const caleEfectiva = path.join(rootLog, NUME_FISIER_LOG_ACTIVITATE_HOOKS);
-  scrieBlocInFisier(caleEfectiva, bloc);
+  scrieBlocInFisier(caleHuman, HEADER_HUMAN, blocHuman);
+  scrieBlocInFisier(caleTehnic, HEADER_TEHNIC, blocTehnic);
 
   const stamp = dataOraBucuresti(now).replace(" Europe/Bucharest", "");
-  commitSiPushLog(rootLog, `Log hook ${hookEvent} ${stamp}`);
+  commitSiPushLoguri(rootLog, `Log hook ${hookEvent} ${stamp}`);
 
-  return caleEfectiva;
+  return {
+    humanReadable: caleHuman,
+    tehnic: caleTehnic,
+  };
 }
