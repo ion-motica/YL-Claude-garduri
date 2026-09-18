@@ -42,9 +42,14 @@ Detaliile complete se scriu in fisierul runtime din repository-ul de lucru YL:
 Hookul foloseste cwd-ul repository-ului primit de la Claude Code.
 Daca acest cwd lipseste, foloseste process.cwd() ca fallback.
 
-Fisierul de log este pastrat in repository-ul de lucru pentru audit si inspectie,
-dar trebuie ignorat de Git, astfel incat logarea continua sa nu murdareasca
-working tree-ul si sa nu intre in commituri.
+Fisierul de log este pastrat in repository-ul de lucru pentru audit si inspectie.
+Helperul de logging trebuie sa asigure local regula:
+1 Hook Tests/log activitate hooks.txt
+in .git/info/exclude al repository-ului de lucru, astfel incat logarea continua
+sa nu murdareasca working tree-ul si sa nu intre in commituri.
+
+Nu este necesara modificarea .gitignore din repository-ul YL pentru aceasta regula
+de runtime; excluderea este locala workspace-ului.
 
 Fiecare hook existent si fiecare hook nou trebuie sa inregistreze:
 - data si ora;
