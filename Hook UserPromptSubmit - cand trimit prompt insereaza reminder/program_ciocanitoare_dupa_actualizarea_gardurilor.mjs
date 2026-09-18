@@ -186,7 +186,10 @@ try {
   const reminderFileErrors = validateRemindere(rawReminders, FILE_REMINDERE);
   if (reminderFileErrors.length === 0) {
     const config = parseReminderConfig(rawReminders);
-    const currentPrompt = typeof input.prompt === "string" ? input.prompt : "";
+    const currentPrompt =
+      typeof input.prompt === "string" ? input.prompt :
+      typeof input.user_prompt === "string" ? input.user_prompt :
+      "";
     const previousAssistant = readLastAssistantMessage(input.transcript_path);
     selected = selectReminders(config, currentPrompt, previousAssistant);
   }
@@ -234,6 +237,33 @@ if (injectedContext) {
 const additionalContext = contextParts.join("\n\n");
 let display = ccnScurt(statusActualizare, selected);
 
+const promptCurentPentruLog =
+  typeof input.prompt === "string" ? input.prompt :
+  typeof input.user_prompt === "string" ? input.user_prompt :
+  "";
+
+const linieCcnUpdater = `${FOLDER_UPDATE} a facut verificarea/actualizarea gardurilor (${statusActualizare?.status || "necunoscut"}).`;
+const linieCcnReminder = `${FOLDER_REMINDER} a facut inserarea reminderelor: ${selected.length}.`;
+
+const actiuniUpdaterHuman = [];
+if (statusActualizare?.status === "deja_la_zi") {
+  actiuniUpdaterHuman.push("Nu a detectat nimic de actualizat.");
+} else if (statusActualizare?.status === "actualizat") {
+  actiuniUpdaterHuman.push("A actualizat gardurile din GitHub.");
+} else {
+  actiuniUpdaterHuman.push(`A sesizat statusul updaterului: ${statusActualizare?.status || "necunoscut"}.`);
+}
+actiuniUpdaterHuman.push("A inserat in CCN:", linieCcnUpdater);
+
+const actiuniReminderHuman = selected.length === 0
+  ? ["Nu a detectat nimic de facut."]
+  : [
+      "A inserat in CCN:",
+      linieCcnReminder,
+      "A inserat in additional context:",
+      additionalContext || "(nimic)",
+    ];
+
 const detaliiLog = [
   "STATUS ACTUALIZARE GARDURI:",
   JSON.stringify(statusActualizare, null, 2),
@@ -251,12 +281,24 @@ const detaliiLog = [
 try {
   scrieLogActivitateHook({
     repositoryRoot: input?.cwd,
+    transcriptPath: input?.transcript_path || "",
+    promptText: promptCurentPentruLog,
     sessionId: input?.session_id,
     hookEvent: "UserPromptSubmit",
     folderHookRepo: `${FOLDER_UPDATE} + ${FOLDER_REMINDER}`,
     activitate: "a verificat/actualizat gardurile, a generat/verificat listele de editare si a selectat reminderele",
     ccn: display,
     additionalContext,
+    humanGarduri: [
+      {
+        folder: FOLDER_UPDATE,
+        actiuni: actiuniUpdaterHuman,
+      },
+      {
+        folder: FOLDER_REMINDER,
+        actiuni: actiuniReminderHuman,
+      },
+    ],
     alteMesajeCatreClaude: "",
     alteActivitati: detaliiLog,
   });
