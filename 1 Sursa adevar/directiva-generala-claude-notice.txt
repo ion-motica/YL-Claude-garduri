@@ -42,37 +42,62 @@ Toate hookurile existente si viitoare folosesc acest helper.
 Nu crea logger separat intr-un hook; daca se schimba destinatia sau formatul logului,
 schimbarea se face in helperul comun.
 
-Detaliile complete se scriu persistent in repository-ul separat:
+Detaliile se scriu persistent in repository-ul separat:
 
 ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude
 
-Fisierul canonic este:
-log activitate hooks.txt
+Exista DOUA fisiere de log, produse de acelasi helper comun si acelasi apel al gardului:
+
+1. log human readable.txt
+   - jurnal scurt si usor de citit de om;
+   - spune ce gard a rulat, ce hook l-a declansat, ce a facut, decizia principala;
+   - poate arata textul trimis efectiv lui Claude cand acesta este util pentru intelegere;
+   - nu contine dumpuri tehnice, hashuri sau diagnostice lungi.
+
+2. log tehnic.txt
+   - jurnal complet pentru diagnostic;
+   - are obligatoriu o SECTIUNE_COMUNA identica drept schema pentru toate gardurile;
+   - apoi CANALE_CATRE_CLAUDE cu textele exacte;
+   - apoi DETALII_SPECIFICE_GARDULUI.
+
+SECTIUNEA_COMUNA din logul tehnic trebuie sa contina cel putin:
+- versiunea schemei de log;
+- data si ora Europe/Bucharest;
+- sesiunea;
+- hook event;
+- numele folderului gardului din repo;
+- activitatea principala;
+- permissionDecision, daca exista;
+- tool_name si target path, daca exista;
+- repository root primit de la Claude Code;
+- process.cwd;
+- rootul runtime al pluginului si commitul lui Git;
+- versiunea Node si platforma/arhitectura;
+- repository-ul remote si clona locala folosite pentru logging;
+- commitul repository-ului de log inainte de intrarea curenta.
+
+CANALE_CATRE_CLAUDE trebuie sa pastreze exact, separat:
+- CCN / systemMessage;
+- additionalContext;
+- permissionDecisionReason;
+- orice alt mesaj catre Claude.
+
+DETALII_SPECIFICE_GARDULUI contin informatiile suplimentare pe care numai gardul respectiv
+le poate cunoaste: de exemplu status updater, hashuri de configuratie, liste PERMISE/INTERZISE,
+trigger-ele si reminderele selectate sau alte date de diagnostic.
 
 Helperul comun foloseste o clona tehnica separata, in /tmp, pentru fiecare sesiune.
 La fiecare intrare de log:
 - sincronizeaza clona cu branch-ul main;
-- adauga intrarea;
-- face commit;
+- scrie AMBELE fisiere;
+- face UN SINGUR commit pentru ambele;
 - face push pe main.
 
 Repository-ul de lucru YL nu mai este destinatia logului si nu trebuie murdarit
-de logging. Hookurile individuale nu implementeaza clone/pull/commit/push;
-toata aceasta responsabilitate ramane numai in helperul comun.
+de logging. Hookurile individuale nu implementeaza clone/pull/commit/push si nu au
+logger separat; toata aceasta responsabilitate ramane numai in helperul comun.
 
-Fiecare hook existent si fiecare hook nou trebuie sa inregistreze:
-- data si ora;
-- sesiunea;
-- evenimentul hook;
-- numele folderului hook din repo;
-- ce a facut;
-- textul exact trimis in CCN / systemMessage;
-- textul exact trimis in additionalContext;
-- permissionDecisionReason, cand exista, intr-o sectiune explicita;
-- orice alt mesaj trimis lui Claude;
-- alte activitati tehnice relevante.
-
-In log se folosesc randuri normale cu newline.
+In ambele loguri se folosesc randuri normale cu newline.
 Nu comprima logul cu " | ".
 
 REGULA CCN VS ADDITIONAL CONTEXT
