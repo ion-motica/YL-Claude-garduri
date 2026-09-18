@@ -1,70 +1,31 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 export const NUME_FISIER_LOG_ACTIVITATE_HOOKS = "log activitate hooks.txt";
-export const NUME_FOLDER_LOG_ACTIVITATE_HOOKS = "1 Hook Tests";
-export const REGULA_IGNORE_LOG_ACTIVITATE_HOOKS =
-  `${NUME_FOLDER_LOG_ACTIVITATE_HOOKS}/${NUME_FISIER_LOG_ACTIVITATE_HOOKS}`;
+export const REPOSITORY_LOG_ACTIVITATE_HOOKS =
+  "ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude";
+export const URL_REPOSITORY_LOG_ACTIVITATE_HOOKS =
+  `https://github.com/${REPOSITORY_LOG_ACTIVITATE_HOOKS}.git`;
 
-export function caleLogActivitateHooksDinRepository(repositoryRoot = process.cwd()) {
-  const root = typeof repositoryRoot === "string" && repositoryRoot.trim()
-    ? path.resolve(repositoryRoot)
-    : process.cwd();
+function idSigur(value) {
+  return String(value || "fara-sesiune").replace(/[^A-Za-z0-9._-]/g, "_");
+}
 
+export function caleRepositoryLogLocal(sessionId = "fara-sesiune") {
   return path.join(
-    root,
-    NUME_FOLDER_LOG_ACTIVITATE_HOOKS,
-    NUME_FISIER_LOG_ACTIVITATE_HOOKS,
+    os.tmpdir(),
+    "yl-claude-garduri",
+    "repo-log-hooks",
+    idSigur(sessionId),
   );
 }
 
-export const CALE_LOG_ACTIVITATE_HOOKS = caleLogActivitateHooksDinRepository();
-
-export function asiguraIgnorareLocalaGit(
-  repositoryRoot = process.cwd(),
-  regula = REGULA_IGNORE_LOG_ACTIVITATE_HOOKS,
-) {
-  const root = typeof repositoryRoot === "string" && repositoryRoot.trim()
-    ? path.resolve(repositoryRoot)
-    : process.cwd();
-
-  try {
-    const gitPathRaw = execFileSync(
-      "git",
-      ["-C", root, "rev-parse", "--git-path", "info/exclude"],
-      { encoding: "utf8" },
-    ).trim();
-
-    if (!gitPathRaw) {
-      return { ok: false, eroare: "git nu a returnat calea info/exclude" };
-    }
-
-    const excludePath = path.isAbsolute(gitPathRaw)
-      ? gitPathRaw
-      : path.resolve(root, gitPathRaw);
-
-    mkdirSync(path.dirname(excludePath), { recursive: true });
-
-    const existent = existsSync(excludePath)
-      ? readFileSync(excludePath, "utf8")
-      : "";
-
-    const reguli = existent
-      .split(/\r?\n/)
-      .map((linie) => linie.trim())
-      .filter(Boolean);
-
-    if (!reguli.includes(regula)) {
-      const prefix = existent.length > 0 && !existent.endsWith("\n") ? "\n" : "";
-      appendFileSync(excludePath, `${prefix}${regula}\n`, "utf8");
-    }
-
-    return { ok: true, excludePath, regula };
-  } catch (error) {
-    return { ok: false, eroare: error?.message || String(error) };
-  }
-}
+export const CALE_LOG_ACTIVITATE_HOOKS = path.join(
+  caleRepositoryLogLocal(),
+  NUME_FISIER_LOG_ACTIVITATE_HOOKS,
+);
 
 const HEADER = `LOG ACTIVITATE HOOKS - YL-Claude-garduri
 
@@ -73,16 +34,18 @@ Fiecare hook trebuie sa inregistreze aici, cu randuri normale:
 - ce a facut;
 - textul exact trimis in CCN / systemMessage;
 - textul exact trimis in additionalContext;
-- orice alt mesaj trimis lui Claude, de exemplu permissionDecisionReason;
+- permissionDecisionReason, cand exista;
+- orice alt mesaj trimis lui Claude;
 - alte activitati relevante facute de hook.
 
 CCN ramane foarte scurt: "<nume folder hook in repo> a facut X."
 Detaliile tehnice si de audit stau in acest log, nu in CCN.
 
-Acest fisier este runtime si este tinut in repository-ul de lucru,
-in folderul "1 Hook Tests". Helperul incearca sa adauge automat
-"1 Hook Tests/log activitate hooks.txt" in .git/info/exclude,
-ca logarea sa nu murdareasca working tree-ul si sa nu intre in commituri.
+Acest fisier este persistent in repository-ul separat:
+${REPOSITORY_LOG_ACTIVITATE_HOOKS}
+
+Toate hookurile folosesc acelasi helper comun de logging.
+Helperul sincronizeaza fiecare intrare prin git commit + push.
 
 `;
 
@@ -110,43 +73,101 @@ function textSauNimic(value) {
   return text.length ? text : "(nimic)";
 }
 
-export function scrieLogActivitateHook({
-  sessionId = "necunoscuta",
-  hookEvent = "necunoscut",
-  folderHookRepo = "necunoscut",
-  activitate = "necunoscuta",
-  ccn = "",
-  additionalContext = "",
-  alteMesajeCatreClaude = "",
-  alteActivitati = "",
-  now = new Date(),
-  repositoryRoot = process.cwd(),
-  filePath = null,
-} = {}) {
-  const caleEfectiva = filePath || caleLogActivitateHooksDinRepository(repositoryRoot);
-  const rezultatIgnorareGit = filePath
-    ? null
-    : asiguraIgnorareLocalaGit(repositoryRoot);
+function ruleazaGit(args, { cwd = null } = {}) {
+  return execFileSync("git", args, {
+    cwd: cwd || undefined,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
 
-  mkdirSync(path.dirname(caleEfectiva), { recursive: true });
-  if (!existsSync(caleEfectiva)) {
-    writeFileSync(caleEfectiva, HEADER, "utf8");
+function esteRepositoryGit(root) {
+  try {
+    return ruleazaGit(["-C", root, "rev-parse", "--is-inside-work-tree"]) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function asiguraRepositoryLogLocal({
+  localRepoPath,
+  remoteUrl = URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
+} = {}) {
+  if (!localRepoPath) throw new Error("lipseste localRepoPath pentru repository-ul de log");
+
+  if (existsSync(localRepoPath)) {
+    if (!esteRepositoryGit(localRepoPath)) {
+      throw new Error(`calea de log exista dar nu este repository Git: ${localRepoPath}`);
+    }
+    return localRepoPath;
   }
 
-  const stareIgnorareGit = rezultatIgnorareGit
-    ? (rezultatIgnorareGit.ok
-      ? `OK: ${rezultatIgnorareGit.regula} in ${rezultatIgnorareGit.excludePath}`
-      : `EROARE: ${rezultatIgnorareGit.eroare}`)
-    : "(nu se aplica: filePath explicit)";
+  mkdirSync(path.dirname(localRepoPath), { recursive: true });
+  ruleazaGit([
+    "clone",
+    "--branch", "main",
+    "--single-branch",
+    remoteUrl,
+    localRepoPath,
+  ]);
+  return localRepoPath;
+}
 
-  const bloc = [
+function sincronizeazaInainteDeScriere(localRepoPath) {
+  ruleazaGit(["-C", localRepoPath, "pull", "--rebase", "origin", "main"]);
+}
+
+function commitSiPushLog(localRepoPath, mesajCommit) {
+  const stare = ruleazaGit([
+    "-C", localRepoPath,
+    "status", "--porcelain",
+    "--", NUME_FISIER_LOG_ACTIVITATE_HOOKS,
+  ]);
+
+  if (!stare) return;
+
+  ruleazaGit([
+    "-C", localRepoPath,
+    "add", "--",
+    NUME_FISIER_LOG_ACTIVITATE_HOOKS,
+  ]);
+
+  ruleazaGit([
+    "-C", localRepoPath,
+    "-c", "user.name=YL-Claude-garduri logger",
+    "-c", "user.email=yl-claude-garduri-logger@users.noreply.github.com",
+    "commit",
+    "-m", mesajCommit,
+    "--", NUME_FISIER_LOG_ACTIVITATE_HOOKS,
+  ]);
+
+  try {
+    ruleazaGit(["-C", localRepoPath, "push", "origin", "HEAD:main"]);
+  } catch {
+    ruleazaGit(["-C", localRepoPath, "pull", "--rebase", "origin", "main"]);
+    ruleazaGit(["-C", localRepoPath, "push", "origin", "HEAD:main"]);
+  }
+}
+
+function construiesteBlocLog({
+  sessionId,
+  hookEvent,
+  folderHookRepo,
+  activitate,
+  ccn,
+  additionalContext,
+  permissionDecisionReason,
+  alteMesajeCatreClaude,
+  alteActivitati,
+  now,
+}) {
+  return [
     "============================================================",
     `DATA_ORA: ${dataOraBucuresti(now)}`,
     `SESIUNE: ${sessionId}`,
     `HOOK_EVENT: ${hookEvent}`,
     `FOLDER_HOOK_REPO: ${folderHookRepo}`,
     `ACTIVITATE: ${activitate}`,
-    `GIT_LOCAL_EXCLUDE: ${stareIgnorareGit}`,
     "",
     "CCN_BEGIN",
     textSauNimic(ccn),
@@ -155,6 +176,10 @@ export function scrieLogActivitateHook({
     "ADDITIONAL_CONTEXT_BEGIN",
     textSauNimic(additionalContext),
     "ADDITIONAL_CONTEXT_END",
+    "",
+    "PERMISSION_DECISION_REASON_BEGIN",
+    textSauNimic(permissionDecisionReason),
+    "PERMISSION_DECISION_REASON_END",
     "",
     "ALTE_MESAJE_CATRE_CLAUDE_BEGIN",
     textSauNimic(alteMesajeCatreClaude),
@@ -165,7 +190,58 @@ export function scrieLogActivitateHook({
     "ALTE_ACTIVITATI_END",
     "",
   ].join("\n");
+}
 
+function scrieBlocInFisier(caleEfectiva, bloc) {
+  mkdirSync(path.dirname(caleEfectiva), { recursive: true });
+  if (!existsSync(caleEfectiva)) {
+    writeFileSync(caleEfectiva, HEADER, "utf8");
+  }
   appendFileSync(caleEfectiva, `${bloc}\n`, "utf8");
+}
+
+export function scrieLogActivitateHook({
+  sessionId = "necunoscuta",
+  hookEvent = "necunoscut",
+  folderHookRepo = "necunoscut",
+  activitate = "necunoscuta",
+  ccn = "",
+  additionalContext = "",
+  permissionDecisionReason = "",
+  alteMesajeCatreClaude = "",
+  alteActivitati = "",
+  now = new Date(),
+  filePath = null,
+  localRepoPath = null,
+  remoteUrl = URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
+} = {}) {
+  const bloc = construiesteBlocLog({
+    sessionId,
+    hookEvent,
+    folderHookRepo,
+    activitate,
+    ccn,
+    additionalContext,
+    permissionDecisionReason,
+    alteMesajeCatreClaude,
+    alteActivitati,
+    now,
+  });
+
+  if (filePath) {
+    scrieBlocInFisier(filePath, bloc);
+    return filePath;
+  }
+
+  const rootLog = localRepoPath || caleRepositoryLogLocal(sessionId);
+  asiguraRepositoryLogLocal({ localRepoPath: rootLog, remoteUrl });
+  sincronizeazaInainteDeScriere(rootLog);
+
+  const caleEfectiva = path.join(rootLog, NUME_FISIER_LOG_ACTIVITATE_HOOKS);
+  scrieBlocInFisier(caleEfectiva, bloc);
+
+  const stamp = dataOraBucuresti(now).replace(" Europe/Bucharest", "");
+  commitSiPushLog(rootLog, `Log hook ${hookEvent} ${stamp}`);
+
   return caleEfectiva;
 }
