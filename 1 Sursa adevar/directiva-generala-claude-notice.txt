@@ -35,13 +35,16 @@ Scopul CCN este doar sa confirme rapid utilizatorului:
 
 REGULA LOG ACTIVITATE HOOKS
 
-Detaliile complete se scriu in fisierul runtime:
+Detaliile complete se scriu in fisierul runtime din repository-ul de lucru YL:
 
-log activitate hooks.txt
+1 Hook Tests/log activitate hooks.txt
 
-Fisierul runtime este tinut in afara checkout-ului pluginului,
-sub directorul temporar YL-Claude-garduri, ca scrierea logului
-sa nu murdareasca repository-ul si sa nu blocheze updaterul GitHub.
+Hookul foloseste cwd-ul repository-ului primit de la Claude Code.
+Daca acest cwd lipseste, foloseste process.cwd() ca fallback.
+
+Fisierul de log este pastrat in repository-ul de lucru pentru audit si inspectie,
+dar trebuie ignorat de Git, astfel incat logarea continua sa nu murdareasca
+working tree-ul si sa nu intre in commituri.
 
 Fiecare hook existent si fiecare hook nou trebuie sa inregistreze:
 - data si ora;
