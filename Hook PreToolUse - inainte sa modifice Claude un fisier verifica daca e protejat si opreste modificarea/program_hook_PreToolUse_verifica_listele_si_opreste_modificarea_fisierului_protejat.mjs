@@ -11,7 +11,7 @@ import {
   verdictPentruCale,
 } from "./motor_calculeaza_liste_efective_de_fisiere_permise_si_interzise.mjs";
 import {
-  CALE_LOG_ACTIVITATE_HOOKS,
+  construiesteRaportEroareJurnalizare,
   scrieLogActivitateHook,
 } from "../shared/program_scrie_log_activitate_hooks.mjs";
 
@@ -257,7 +257,18 @@ async function main() {
         ].join("\n"),
       });
     } catch (error) {
-      output.systemMessage = `${output.systemMessage || ccnScurt("verificarea")} | ${FOLDER_HOOK} nu a putut scrie ${path.basename(CALE_LOG_ACTIVITATE_HOOKS)}.`;
+      const raportEroare = construiesteRaportEroareJurnalizare({
+        error,
+        sessionId: input?.session_id,
+        folderHookRepo: FOLDER_HOOK,
+      });
+      output.systemMessage = `${output.systemMessage || ccnScurt("verificarea")} | ${raportEroare.ccn}`;
+      output.hookSpecificOutput ||= { hookEventName: "PreToolUse" };
+      const contextAnterior = output.hookSpecificOutput.additionalContext || "";
+      output.hookSpecificOutput.additionalContext = [
+        contextAnterior,
+        raportEroare.additionalContext,
+      ].filter(Boolean).join("\n\n");
     }
 
     process.stdout.write(`${JSON.stringify(output)}\n`);

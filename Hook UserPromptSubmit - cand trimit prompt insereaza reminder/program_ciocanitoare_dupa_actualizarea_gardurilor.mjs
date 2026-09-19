@@ -16,7 +16,7 @@ import {
 } from "./motor_alegere_reminder_de_inserat.mjs";
 import { asiguraListeEfectiveDeEditare } from "../Hook PreToolUse - inainte sa modifice Claude un fisier verifica daca e protejat si opreste modificarea/motor_calculeaza_liste_efective_de_fisiere_permise_si_interzise.mjs";
 import {
-  CALE_LOG_ACTIVITATE_HOOKS,
+  construiesteRaportEroareJurnalizare,
   memoreazaTitluChatDeclaratDeUser,
   scrieLogActivitateHook,
 } from "../shared/program_scrie_log_activitate_hooks.mjs";
@@ -234,6 +234,7 @@ if (injectedContext) {
 }
 
 const additionalContext = contextParts.join("\n\n");
+let additionalContextFinal = additionalContext;
 let display = ccnScurt(statusActualizare, selected);
 
 const promptCurentPentruLog =
@@ -315,15 +316,23 @@ try {
     alteActivitati: detaliiLog,
   });
 } catch (error) {
-  display += ` | ${FOLDER_UPDATE} nu a putut scrie ${path.basename(CALE_LOG_ACTIVITATE_HOOKS)}.`;
+  const raportEroare = construiesteRaportEroareJurnalizare({
+    error,
+    sessionId: input?.session_id,
+    folderHookRepo: `${FOLDER_UPDATE} + ${FOLDER_REMINDER}`,
+  });
+  display += ` | ${raportEroare.ccn}`;
+  additionalContextFinal = [additionalContextFinal, raportEroare.additionalContext]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 const output = { systemMessage: display };
-if (additionalContext || rezultatTitluChat.acceptatAcum) {
+if (additionalContextFinal || rezultatTitluChat.acceptatAcum) {
   output.hookSpecificOutput = {
     hookEventName: "UserPromptSubmit",
   };
-  if (additionalContext) output.hookSpecificOutput.additionalContext = additionalContext;
+  if (additionalContextFinal) output.hookSpecificOutput.additionalContext = additionalContextFinal;
   if (rezultatTitluChat.acceptatAcum) {
     output.hookSpecificOutput.sessionTitle = rezultatTitluChat.titlu;
   }
