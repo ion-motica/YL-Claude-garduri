@@ -7,13 +7,16 @@ import {
   caleRepositoryLogLocal,
   citesteTitluChatDinTranscript,
   citesteUltimulPromptUserDinTranscript,
+  construiesteOptiuniAutentificareGitLog,
   construiesteRaportEroareJurnalizare,
   extrageTitluChatDeclarat,
   memoreazaTitluChatDeclaratDeUser,
   memoreazaTitluSesiune,
   NUME_FISIER_LOG_HUMAN_READABLE,
   NUME_FISIER_LOG_TEHNIC,
+  NUME_VARIABILA_TOKEN_REPOSITORY_LOG,
   scrieLogActivitateHook,
+  URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
 } from "../shared/program_scrie_log_activitate_hooks.mjs";
 
 function git(args, cwd = null) {
@@ -27,6 +30,46 @@ function git(args, cwd = null) {
 assert.match(
   caleRepositoryLogLocal("abc/def"),
   /yl-claude-garduri[\\/]repo-log-hooks[\\/]abc_def$/,
+);
+
+const tokenTest = "TOKEN_EXACT_TEST_FARA_PREFIX_STANDARD_123";
+const optiuniFaraAutentificare = construiesteOptiuniAutentificareGitLog({
+  remoteUrl: "/tmp/repository-local-test.git",
+  env: { [NUME_VARIABILA_TOKEN_REPOSITORY_LOG]: tokenTest },
+});
+assert.equal(optiuniFaraAutentificare.necesitaAutentificare, false);
+assert.deepEqual(optiuniFaraAutentificare.envSuplimentar, {});
+
+assert.throws(
+  () => construiesteOptiuniAutentificareGitLog({
+    remoteUrl: URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
+    env: {},
+  }),
+  /CREDENTIAL_LOG_GITHUB_LIPSA/,
+);
+
+const optiuniCuAutentificare = construiesteOptiuniAutentificareGitLog({
+  remoteUrl: URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
+  env: { [NUME_VARIABILA_TOKEN_REPOSITORY_LOG]: tokenTest },
+});
+assert.equal(optiuniCuAutentificare.necesitaAutentificare, true);
+assert.equal(optiuniCuAutentificare.envSuplimentar.GIT_ASKPASS_REQUIRE, "force");
+assert.equal(optiuniCuAutentificare.envSuplimentar.GIT_TERMINAL_PROMPT, "0");
+assert.equal(
+  execFileSync(
+    optiuniCuAutentificare.envSuplimentar.GIT_ASKPASS,
+    ["Username for 'https://github.com':"],
+    { encoding: "utf8", env: { ...process.env, ...optiuniCuAutentificare.envSuplimentar } },
+  ).trim(),
+  "x-access-token",
+);
+assert.equal(
+  execFileSync(
+    optiuniCuAutentificare.envSuplimentar.GIT_ASKPASS,
+    ["Password for 'https://x-access-token@github.com':"],
+    { encoding: "utf8", env: { ...process.env, ...optiuniCuAutentificare.envSuplimentar } },
+  ).trim(),
+  tokenTest,
 );
 
 const dir = mkdtempSync(path.join(os.tmpdir(), "yl-hook-log-human-ordonat-test-"));
@@ -252,17 +295,40 @@ const nrCommituri = Number(git([
 ]));
 assert.equal(nrCommituri, 3);
 
+let eroareRemoteNepotrivit;
+try {
+  scrieLogActivitateHook({
+    sessionId: "sesiune-remote-nepotrivit-test",
+    hookEvent: "UserPromptSubmit",
+    localRepoPath: clonaLogger,
+    remoteUrl: path.join(dir, "alt-remote-decat-origin.git"),
+  });
+} catch (error) {
+  eroareRemoteNepotrivit = error;
+}
+assert.ok(eroareRemoteNepotrivit);
+const raportRemoteNepotrivit = construiesteRaportEroareJurnalizare({
+  error: eroareRemoteNepotrivit,
+  sessionId: "sesiune-remote-nepotrivit-test",
+  folderHookRepo: "Hook UserPromptSubmit - test remote nepotrivit",
+});
+assert.match(raportRemoteNepotrivit.diagnosticComun, /etapa=PREGATIRE_REPOSITORY_LOG_LOCAL/);
+assert.match(raportRemoteNepotrivit.diagnosticComun, /REPOSITORY_LOG_REMOTE_NEASTEPTAT/);
+assert.match(raportRemoteNepotrivit.diagnosticComun, /cod=REPOSITORY_LOG_REMOTE_NEASTEPTAT/);
+
 const repositoryInvalid = path.join(dir, "repository-log-invalid");
 mkdirSync(repositoryInvalid, { recursive: true });
 writeFileSync(path.join(repositoryInvalid, "nu-este-git.txt"), "test\n", "utf8");
 
 let eroareJurnalizare;
+const tokenAnterior = process.env[NUME_VARIABILA_TOKEN_REPOSITORY_LOG];
+process.env[NUME_VARIABILA_TOKEN_REPOSITORY_LOG] = tokenTest;
 try {
   scrieLogActivitateHook({
     sessionId: "sesiune-diagnostic-test",
     hookEvent: "UserPromptSubmit",
     localRepoPath: repositoryInvalid,
-    remoteUrl: "https://utilizator:secret@example.invalid/loguri.git",
+    remoteUrl: `https://utilizator:secret@example.invalid/${tokenTest}/loguri.git`,
   });
 } catch (error) {
   eroareJurnalizare = error;
@@ -281,7 +347,7 @@ assert.match(raportEroare.diagnosticComun, /etapa=PREGATIRE_REPOSITORY_LOG_LOCAL
 assert.match(raportEroare.diagnosticComun, /cod=necunoscut/);
 assert.match(raportEroare.diagnosticComun, /calea de log exista dar nu este repository Git/);
 assert.match(raportEroare.diagnosticComun, /repository_local=.*repository-log-invalid/);
-assert.match(raportEroare.diagnosticComun, /repository_remote=https:\/\/\[credentiale-mascate\]@example\.invalid\/loguri\.git/);
+assert.match(raportEroare.diagnosticComun, /repository_remote=https:\/\/\[credentiale-mascate\]@example\.invalid\/\[token-mascat\]\/loguri\.git/);
 assert.match(raportEroare.diagnosticComun, /loguri_scrise_local=nu\/necunoscut/);
 assert.doesNotMatch(raportEroare.diagnosticComun, /secret/);
 assert.ok(raportEroare.ccn.includes(raportEroare.diagnosticComun));
@@ -292,5 +358,37 @@ assert.equal(typeof raportEroare.caleFallback, "string");
 assert.ok(existsSync(raportEroare.caleFallback));
 assert.match(readFileSync(raportEroare.caleFallback, "utf8"), /ETAPA: PREGATIRE_REPOSITORY_LOG_LOCAL/);
 assert.doesNotMatch(readFileSync(raportEroare.caleFallback, "utf8"), /secret/);
+assert.doesNotMatch(raportEroare.diagnosticComun, new RegExp(tokenTest));
+assert.doesNotMatch(raportEroare.ccn, new RegExp(tokenTest));
+assert.doesNotMatch(raportEroare.additionalContext, new RegExp(tokenTest));
+assert.doesNotMatch(readFileSync(raportEroare.caleFallback, "utf8"), new RegExp(tokenTest));
+
+delete process.env[NUME_VARIABILA_TOKEN_REPOSITORY_LOG];
+
+const clonaFaraCredential = path.join(dir, "clona-fara-credential");
+let eroareCredentialLipsa;
+try {
+  scrieLogActivitateHook({
+    sessionId: "sesiune-credential-lipsa-test",
+    hookEvent: "UserPromptSubmit",
+    localRepoPath: clonaFaraCredential,
+  });
+} catch (error) {
+  eroareCredentialLipsa = error;
+}
+assert.ok(eroareCredentialLipsa);
+const raportCredentialLipsa = construiesteRaportEroareJurnalizare({
+  error: eroareCredentialLipsa,
+  sessionId: "sesiune-credential-lipsa-test",
+  folderHookRepo: "Hook UserPromptSubmit - test credential lipsa",
+});
+assert.match(raportCredentialLipsa.diagnosticComun, /etapa=CONFIGURARE_CREDENTIAL_LOG_GITHUB/);
+assert.match(raportCredentialLipsa.diagnosticComun, /cod=CREDENTIAL_LOG_GITHUB_LIPSA/);
+assert.match(raportCredentialLipsa.diagnosticComun, /YL_GARDURI_LOG_GITHUB_TOKEN nu este disponibila/);
+assert.equal(existsSync(clonaFaraCredential), false);
+
+if (tokenAnterior !== undefined) {
+  process.env[NUME_VARIABILA_TOKEN_REPOSITORY_LOG] = tokenAnterior;
+}
 
 console.log("LOG HUMAN + TEHNIC V4 + DIAGNOSTIC EROARE IN CCN SI ADDITIONAL CONTEXT TEST OK");
