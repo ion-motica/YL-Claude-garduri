@@ -47,6 +47,8 @@ un diagnostic comun care precizeaza cel putin:
   nu a putut fi salvata.
 
 Datele sensibile din mesaj, stderr ori URL se mascheaza inainte de afisare.
+Valoarea exacta a credentialului de logging se mascheaza chiar daca nu are un prefix
+standard GitHub.
 
 Acelasi diagnostic comun se trimite simultan:
 1. in CCN/systemMessage, chiar daca pentru aceasta eroare critica CCN devine mai lung;
@@ -140,6 +142,16 @@ La fiecare intrare de log:
 Repository-ul de lucru YL nu mai este destinatia logului si nu trebuie murdarit
 de logging. Hookurile individuale nu implementeaza clone/pull/commit/push si nu au
 logger separat; toata aceasta responsabilitate ramane numai in helperul comun.
+
+Pentru repository-ul remote exact de logging, helperul comun foloseste credentialul
+din variabila de environment `YL_GARDURI_LOG_GITHUB_TOKEN`, prin `GIT_ASKPASS`.
+Credentialul nu se pune in URL si nu se pune in argumentele comenzilor Git.
+Acesta nu se foloseste pentru niciun alt repository. Inainte de fiecare operatie
+de retea, URL-ul efectiv al remote-ului origin trebuie sa coincida exact cu URL-ul
+canonic asteptat; orice abatere opreste operatia inainte sa primeasca credentialul.
+Daca variabila lipseste,
+jurnalizarea esueaza explicit in etapa CONFIGURARE_CREDENTIAL_LOG_GITHUB, cu codul
+CREDENTIAL_LOG_GITHUB_LIPSA, apoi aplica raportarea diagnostica de mai sus.
 
 In ambele loguri se folosesc randuri normale cu newline.
 Nu comprima logul cu " | ".

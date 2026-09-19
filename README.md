@@ -18,6 +18,19 @@ yl-claude-garduri@skills-dir
 
 Cloud Environment-ul dedicat este `YL-garduri`. `cloud-environment-setup.sh` este bootstrap-ul initial; el nu este mecanismul curent de refresh la fiecare prompt.
 
+Pentru scrierea in repository-ul privat de loguri, environmentul personal
+`YL-garduri` defineste:
+
+```text
+YL_GARDURI_LOG_GITHUB_TOKEN=<fine-grained PAT limitat la repository-ul de loguri>
+```
+
+Helperul comun foloseste variabila numai prin `GIT_ASKPASS` si numai pentru URL-ul
+canonic `ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude`. Tokenul nu este
+inclus in URL sau in argumentele Git si este mascat din diagnostice. Variabilele
+environmentului sunt incarcate numai in sesiunile Claude Code pornite ulterior
+salvarii lor.
+
 ## Conventie de organizare a hookurilor
 
 Folderele controlate de noi folosesc forma:
