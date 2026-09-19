@@ -143,15 +143,13 @@ Repository-ul de lucru YL nu mai este destinatia logului si nu trebuie murdarit
 de logging. Hookurile individuale nu implementeaza clone/pull/commit/push si nu au
 logger separat; toata aceasta responsabilitate ramane numai in helperul comun.
 
-Pentru repository-ul remote exact de logging, helperul comun foloseste credentialul
-din variabila de environment `YL_GARDURI_LOG_GITHUB_TOKEN`, prin `GIT_ASKPASS`.
-Credentialul nu se pune in URL si nu se pune in argumentele comenzilor Git.
-Acesta nu se foloseste pentru niciun alt repository. Inainte de fiecare operatie
-de retea, URL-ul efectiv al remote-ului origin trebuie sa coincida exact cu URL-ul
-canonic asteptat; orice abatere opreste operatia inainte sa primeasca credentialul.
-Daca variabila lipseste,
-jurnalizarea esueaza explicit in etapa CONFIGURARE_CREDENTIAL_LOG_GITHUB, cu codul
-CREDENTIAL_LOG_GITHUB_LIPSA, apoi aplica raportarea diagnostica de mai sus.
+Pentru repository-ul remote exact de logging, sesiunea Claude Code trebuie sa aiba
+`ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude` in sursele autorizate, cu
+acces push. Helperul nu cere si nu injecteaza un PAT propriu. Inainte de fiecare
+operatie de retea, URL-ul efectiv al remote-ului origin trebuie sa coincida exact
+cu URL-ul canonic asteptat; orice abatere opreste operatia. Daca proxy-ul Git spune
+ca repository-ul nu este in setul autorizat al sesiunii, diagnosticul trebuie sa
+indice explicit folosirea `add_repo` cu acces push si retrimiterea unui prompt.
 
 In ambele loguri se folosesc randuri normale cu newline.
 Nu comprima logul cu " | ".

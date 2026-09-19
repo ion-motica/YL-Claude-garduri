@@ -18,16 +18,10 @@ export const REPOSITORY_LOG_ACTIVITATE_HOOKS =
   "ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude";
 export const URL_REPOSITORY_LOG_ACTIVITATE_HOOKS =
   `https://github.com/${REPOSITORY_LOG_ACTIVITATE_HOOKS}.git`;
-export const NUME_VARIABILA_TOKEN_REPOSITORY_LOG =
-  "YL_GARDURI_LOG_GITHUB_TOKEN";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_PLUGIN = path.resolve(__dirname, "..");
-const CALE_PROGRAM_GIT_ASKPASS_LOG_HOOKS = path.join(
-  __dirname,
-  "program_git_askpass_log_hooks.mjs",
-);
 const LOG_SCHEMA_VERSION = "4";
 
 function idSigur(value) {
@@ -103,12 +97,7 @@ function textPeUnRand(value, limita = 800) {
 }
 
 function mascheazaSecrete(value) {
-  let rezultat = String(value ?? "");
-  const tokenExact = process.env[NUME_VARIABILA_TOKEN_REPOSITORY_LOG];
-  if (tokenExact) {
-    rezultat = rezultat.split(tokenExact).join("[token-mascat]");
-  }
-  return rezultat
+  return String(value ?? "")
     .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/gi, "$1[credentiale-mascate]@")
     .replace(/\bgithub_pat_[A-Za-z0-9_]+\b/g, "[token-mascat]")
     .replace(/\bgh[pousr]_[A-Za-z0-9_]+\b/g, "[token-mascat]")
@@ -141,6 +130,10 @@ function extrageDiagnosticEroareJurnalizare(error) {
   const cauza = error?.cause || error || {};
   const stderr = cauza?.stderr ?? error?.stderr;
   const cod = cauza?.status ?? cauza?.code ?? error?.status ?? error?.code ?? "necunoscut";
+  const textEroare = `${cauza?.message || error?.message || ""}\n${stderr || ""}`;
+  const repositoryNeautorizatInSesiune =
+    /access denied by the git proxy/i.test(textEroare)
+    && /not in this session['’]s authorized repository set/i.test(textEroare);
   return {
     etapa: error?.etapaJurnalizare || "ETAPA_NECUNOSCUTA",
     cod: textPeUnRand(cod, 100),
@@ -155,6 +148,9 @@ function extrageDiagnosticEroareJurnalizare(error) {
       500,
     ),
     loguriScriseLocal: error?.detaliiJurnalizare?.loguriScriseLocal === true ? "da" : "nu/necunoscut",
+    remediere: repositoryNeautorizatInSesiune
+      ? `Adauga ${REPOSITORY_LOG_ACTIVITATE_HOOKS} la sursele autorizate ale sesiunii Claude Code, cu acces push, folosind add_repo; apoi retrimite un prompt pentru retestare.`
+      : "(nedeterminata automat; consulta mesajul si stderr)",
   };
 }
 
@@ -190,6 +186,7 @@ export function construiesteRaportEroareJurnalizare({
     `REPOSITORY_LOG_LOCAL: ${diagnostic.repositoryLocal}`,
     `REPOSITORY_LOG_REMOTE: ${diagnostic.repositoryRemote}`,
     `LOGURI_SCRISE_LOCAL: ${diagnostic.loguriScriseLocal}`,
+    `REMEDIERE: ${diagnostic.remediere}`,
     "",
   ].join("\n");
 
@@ -210,6 +207,7 @@ export function construiesteRaportEroareJurnalizare({
     `repository_local=${diagnostic.repositoryLocal}`,
     `repository_remote=${diagnostic.repositoryRemote}`,
     `loguri_scrise_local=${diagnostic.loguriScriseLocal}`,
+    `remediere=${diagnostic.remediere}`,
     `diagnostic_fallback=${textPeUnRand(rezultatFallback, 500)}`,
   ].join("; ");
 
@@ -396,45 +394,12 @@ export function citesteUltimulPromptUserDinTranscript(transcriptPath) {
   return "";
 }
 
-export function construiesteOptiuniAutentificareGitLog({
-  remoteUrl = URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
-  env = process.env,
-} = {}) {
-  if (remoteUrl !== URL_REPOSITORY_LOG_ACTIVITATE_HOOKS) {
-    return { necesitaAutentificare: false, envSuplimentar: {} };
-  }
-
-  const token = String(env[NUME_VARIABILA_TOKEN_REPOSITORY_LOG] || "").trim();
-  if (!token) {
-    const error = new Error(
-      `CREDENTIAL_LOG_GITHUB_LIPSA: variabila ${NUME_VARIABILA_TOKEN_REPOSITORY_LOG} nu este disponibila`,
-    );
-    error.code = "CREDENTIAL_LOG_GITHUB_LIPSA";
-    throw error;
-  }
-
-  return {
-    necesitaAutentificare: true,
-    envSuplimentar: {
-      [NUME_VARIABILA_TOKEN_REPOSITORY_LOG]: token,
-      GIT_ASKPASS: CALE_PROGRAM_GIT_ASKPASS_LOG_HOOKS,
-      GIT_ASKPASS_REQUIRE: "force",
-      GIT_TERMINAL_PROMPT: "0",
-    },
-  };
-}
-
-function ruleazaGit(args, { cwd = null, autentificareGit = null } = {}) {
-  const argsEfective = autentificareGit?.necesitaAutentificare
-    ? ["-c", "credential.helper=", ...args]
-    : args;
-  return execFileSync("git", argsEfective, {
+function ruleazaGit(args, { cwd = null } = {}) {
+  return execFileSync("git", args, {
     cwd: cwd || undefined,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    env: autentificareGit?.necesitaAutentificare
-      ? { ...process.env, ...autentificareGit.envSuplimentar }
-      : process.env,
+    env: process.env,
   }).trim();
 }
 
@@ -472,7 +437,6 @@ function verificaRemoteRepositoryLog(localRepoPath, remoteUrlAsteptat) {
 export function asiguraRepositoryLogLocal({
   localRepoPath,
   remoteUrl = URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
-  autentificareGit = null,
 } = {}) {
   if (!localRepoPath) throw new Error("lipseste localRepoPath pentru repository-ul de log");
 
@@ -491,20 +455,17 @@ export function asiguraRepositoryLogLocal({
     "--single-branch",
     remoteUrl,
     localRepoPath,
-  ], { autentificareGit });
+  ]);
   verificaRemoteRepositoryLog(localRepoPath, remoteUrl);
   return localRepoPath;
 }
 
-function sincronizeazaInainteDeScriere(localRepoPath, remoteUrl, autentificareGit) {
+function sincronizeazaInainteDeScriere(localRepoPath, remoteUrl) {
   verificaRemoteRepositoryLog(localRepoPath, remoteUrl);
-  ruleazaGit(
-    ["-C", localRepoPath, "pull", "--rebase", "origin", "main"],
-    { autentificareGit },
-  );
+  ruleazaGit(["-C", localRepoPath, "pull", "--rebase", "origin", "main"]);
 }
 
-function commitSiPushLoguri(localRepoPath, remoteUrl, mesajCommit, autentificareGit) {
+function commitSiPushLoguri(localRepoPath, remoteUrl, mesajCommit) {
   const fisiere = [
     NUME_FISIER_LOG_HUMAN_READABLE,
     NUME_FISIER_LOG_TEHNIC,
@@ -540,26 +501,17 @@ function commitSiPushLoguri(localRepoPath, remoteUrl, mesajCommit, autentificare
 
   try {
     verificaRemoteRepositoryLog(localRepoPath, remoteUrl);
-    ruleazaGit(
-      ["-C", localRepoPath, "push", "origin", "HEAD:main"],
-      { autentificareGit },
-    );
+    ruleazaGit(["-C", localRepoPath, "push", "origin", "HEAD:main"]);
   } catch (primaEroarePush) {
     try {
       verificaRemoteRepositoryLog(localRepoPath, remoteUrl);
       ruleazaEtapaJurnalizare("GIT_PULL_DUPA_PUSH_RESPINS", () =>
-        ruleazaGit(
-          ["-C", localRepoPath, "pull", "--rebase", "origin", "main"],
-          { autentificareGit },
-        ),
+        ruleazaGit(["-C", localRepoPath, "pull", "--rebase", "origin", "main"]),
       detalii);
       ruleazaEtapaJurnalizare("GIT_PUSH_REINCERCARE", () =>
         {
           verificaRemoteRepositoryLog(localRepoPath, remoteUrl);
-          return ruleazaGit(
-            ["-C", localRepoPath, "push", "origin", "HEAD:main"],
-            { autentificareGit },
-          );
+          return ruleazaGit(["-C", localRepoPath, "push", "origin", "HEAD:main"]);
         },
       detalii);
     } catch (error) {
@@ -779,20 +731,14 @@ export function scrieLogActivitateHook({
         repositoryRemote: remoteUrl,
         loguriScriseLocal: false,
       };
-      const autentificareGit = ruleazaEtapaJurnalizare(
-        "CONFIGURARE_CREDENTIAL_LOG_GITHUB",
-        () => construiesteOptiuniAutentificareGitLog({ remoteUrl }),
-        detaliiInainteDeScriere,
-      );
       ruleazaEtapaJurnalizare("PREGATIRE_REPOSITORY_LOG_LOCAL", () =>
         asiguraRepositoryLogLocal({
           localRepoPath: rootLog,
           remoteUrl,
-          autentificareGit,
         }),
       detaliiInainteDeScriere);
       ruleazaEtapaJurnalizare("GIT_PULL_INAINTE_DE_SCRIERE", () =>
-        sincronizeazaInainteDeScriere(rootLog, remoteUrl, autentificareGit),
+        sincronizeazaInainteDeScriere(rootLog, remoteUrl),
       detaliiInainteDeScriere);
 
     const stareInitiala = citesteStareSesiune(sessionId);
@@ -884,7 +830,6 @@ export function scrieLogActivitateHook({
         rootLog,
         remoteUrl,
         `Log hook ${hookEvent} ${stamp}`,
-        autentificareGit,
       );
 
       return {
