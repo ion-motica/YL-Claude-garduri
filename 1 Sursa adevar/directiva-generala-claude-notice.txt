@@ -33,6 +33,30 @@ Scopul CCN este doar sa confirme rapid utilizatorului:
 - ce hook/folder a rulat;
 - ce actiune principala a facut.
 
+EXCEPTIE PENTRU EROAREA JURNALIZARII
+
+Daca helperul comun nu poate finaliza jurnalizarea persistenta, mesajul nu are voie
+sa spuna vag doar ca nu a putut scrie "log tehnic.txt". Programul trebuie sa produca
+un diagnostic comun care precizeaza cel putin:
+- etapa exacta care a esuat: lock, pregatire/clonare repository, pull, scrierea fiecarui
+  fisier, git add, commit, pull dupa push respins sau push/reincercare;
+- codul erorii si mesajul/stderr relevant;
+- repository-ul local si remote implicat;
+- daca ambele loguri au fost deja scrise local;
+- unde a fost salvata copia locala fallback a diagnosticului sau de ce nici aceasta
+  nu a putut fi salvata.
+
+Datele sensibile din mesaj, stderr ori URL se mascheaza inainte de afisare.
+
+Acelasi diagnostic comun se trimite simultan:
+1. in CCN/systemMessage, chiar daca pentru aceasta eroare critica CCN devine mai lung;
+2. in additionalContext, impreuna cu instructiunea explicita pentru Claude sa il afiseze
+   distinct si integral LA SFARSITUL raspunsului curent catre utilizator, sub titlul
+   "⚠️ JURNALIZAREA HOOKURILOR A ESUAT", chiar daca sarcina principala a reusit.
+
+Nu pretinde ca jurnalizarea persistenta a reusit. Daca procesul hookului este terminat
+brutal inainte sa poata emite output, nici CCN, nici additionalContext nu pot fi garantate.
+
 REGULA LOG ACTIVITATE HOOKS
 
 Implementarea canonica unica pentru logging este:

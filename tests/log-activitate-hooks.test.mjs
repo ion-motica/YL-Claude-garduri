@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
   caleRepositoryLogLocal,
   citesteTitluChatDinTranscript,
   citesteUltimulPromptUserDinTranscript,
+  construiesteRaportEroareJurnalizare,
   extrageTitluChatDeclarat,
   memoreazaTitluChatDeclaratDeUser,
   memoreazaTitluSesiune,
@@ -251,4 +252,45 @@ const nrCommituri = Number(git([
 ]));
 assert.equal(nrCommituri, 3);
 
-console.log("LOG HUMAN PE PROMPT + GARDURI SEPARATE + LOG TEHNIC V4 TEST OK");
+const repositoryInvalid = path.join(dir, "repository-log-invalid");
+mkdirSync(repositoryInvalid, { recursive: true });
+writeFileSync(path.join(repositoryInvalid, "nu-este-git.txt"), "test\n", "utf8");
+
+let eroareJurnalizare;
+try {
+  scrieLogActivitateHook({
+    sessionId: "sesiune-diagnostic-test",
+    hookEvent: "UserPromptSubmit",
+    localRepoPath: repositoryInvalid,
+    remoteUrl: "https://utilizator:secret@example.invalid/loguri.git",
+  });
+} catch (error) {
+  eroareJurnalizare = error;
+}
+
+assert.ok(eroareJurnalizare, "esecul repository-ului de log trebuia propagat");
+const raportEroare = construiesteRaportEroareJurnalizare({
+  error: eroareJurnalizare,
+  sessionId: "sesiune-diagnostic-test",
+  folderHookRepo: "Hook UserPromptSubmit - test diagnostic",
+  now: new Date("2026-09-19T09:00:00Z"),
+});
+
+assert.match(raportEroare.diagnosticComun, /JURNALIZARE ESUATA/);
+assert.match(raportEroare.diagnosticComun, /etapa=PREGATIRE_REPOSITORY_LOG_LOCAL/);
+assert.match(raportEroare.diagnosticComun, /cod=necunoscut/);
+assert.match(raportEroare.diagnosticComun, /calea de log exista dar nu este repository Git/);
+assert.match(raportEroare.diagnosticComun, /repository_local=.*repository-log-invalid/);
+assert.match(raportEroare.diagnosticComun, /repository_remote=https:\/\/\[credentiale-mascate\]@example\.invalid\/loguri\.git/);
+assert.match(raportEroare.diagnosticComun, /loguri_scrise_local=nu\/necunoscut/);
+assert.doesNotMatch(raportEroare.diagnosticComun, /secret/);
+assert.ok(raportEroare.ccn.includes(raportEroare.diagnosticComun));
+assert.ok(raportEroare.additionalContext.includes(raportEroare.diagnosticComun));
+assert.match(raportEroare.additionalContext, /SFARSITUL raspunsului tau curent/);
+assert.match(raportEroare.additionalContext, /⚠️ JURNALIZAREA HOOKURILOR A ESUAT/);
+assert.equal(typeof raportEroare.caleFallback, "string");
+assert.ok(existsSync(raportEroare.caleFallback));
+assert.match(readFileSync(raportEroare.caleFallback, "utf8"), /ETAPA: PREGATIRE_REPOSITORY_LOG_LOCAL/);
+assert.doesNotMatch(readFileSync(raportEroare.caleFallback, "utf8"), /secret/);
+
+console.log("LOG HUMAN + TEHNIC V4 + DIAGNOSTIC EROARE IN CCN SI ADDITIONAL CONTEXT TEST OK");
