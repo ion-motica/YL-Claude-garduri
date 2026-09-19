@@ -7,16 +7,13 @@ import {
   caleRepositoryLogLocal,
   citesteTitluChatDinTranscript,
   citesteUltimulPromptUserDinTranscript,
-  construiesteOptiuniAutentificareGitLog,
   construiesteRaportEroareJurnalizare,
   extrageTitluChatDeclarat,
   memoreazaTitluChatDeclaratDeUser,
   memoreazaTitluSesiune,
   NUME_FISIER_LOG_HUMAN_READABLE,
   NUME_FISIER_LOG_TEHNIC,
-  NUME_VARIABILA_TOKEN_REPOSITORY_LOG,
   scrieLogActivitateHook,
-  URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
 } from "../shared/program_scrie_log_activitate_hooks.mjs";
 
 function git(args, cwd = null) {
@@ -30,46 +27,6 @@ function git(args, cwd = null) {
 assert.match(
   caleRepositoryLogLocal("abc/def"),
   /yl-claude-garduri[\\/]repo-log-hooks[\\/]abc_def$/,
-);
-
-const tokenTest = "TOKEN_EXACT_TEST_FARA_PREFIX_STANDARD_123";
-const optiuniFaraAutentificare = construiesteOptiuniAutentificareGitLog({
-  remoteUrl: "/tmp/repository-local-test.git",
-  env: { [NUME_VARIABILA_TOKEN_REPOSITORY_LOG]: tokenTest },
-});
-assert.equal(optiuniFaraAutentificare.necesitaAutentificare, false);
-assert.deepEqual(optiuniFaraAutentificare.envSuplimentar, {});
-
-assert.throws(
-  () => construiesteOptiuniAutentificareGitLog({
-    remoteUrl: URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
-    env: {},
-  }),
-  /CREDENTIAL_LOG_GITHUB_LIPSA/,
-);
-
-const optiuniCuAutentificare = construiesteOptiuniAutentificareGitLog({
-  remoteUrl: URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
-  env: { [NUME_VARIABILA_TOKEN_REPOSITORY_LOG]: tokenTest },
-});
-assert.equal(optiuniCuAutentificare.necesitaAutentificare, true);
-assert.equal(optiuniCuAutentificare.envSuplimentar.GIT_ASKPASS_REQUIRE, "force");
-assert.equal(optiuniCuAutentificare.envSuplimentar.GIT_TERMINAL_PROMPT, "0");
-assert.equal(
-  execFileSync(
-    optiuniCuAutentificare.envSuplimentar.GIT_ASKPASS,
-    ["Username for 'https://github.com':"],
-    { encoding: "utf8", env: { ...process.env, ...optiuniCuAutentificare.envSuplimentar } },
-  ).trim(),
-  "x-access-token",
-);
-assert.equal(
-  execFileSync(
-    optiuniCuAutentificare.envSuplimentar.GIT_ASKPASS,
-    ["Password for 'https://x-access-token@github.com':"],
-    { encoding: "utf8", env: { ...process.env, ...optiuniCuAutentificare.envSuplimentar } },
-  ).trim(),
-  tokenTest,
 );
 
 const dir = mkdtempSync(path.join(os.tmpdir(), "yl-hook-log-human-ordonat-test-"));
@@ -321,8 +278,7 @@ mkdirSync(repositoryInvalid, { recursive: true });
 writeFileSync(path.join(repositoryInvalid, "nu-este-git.txt"), "test\n", "utf8");
 
 let eroareJurnalizare;
-const tokenAnterior = process.env[NUME_VARIABILA_TOKEN_REPOSITORY_LOG];
-process.env[NUME_VARIABILA_TOKEN_REPOSITORY_LOG] = tokenTest;
+const tokenTest = "github_pat_TOKEN_TEST_123";
 try {
   scrieLogActivitateHook({
     sessionId: "sesiune-diagnostic-test",
@@ -363,32 +319,21 @@ assert.doesNotMatch(raportEroare.ccn, new RegExp(tokenTest));
 assert.doesNotMatch(raportEroare.additionalContext, new RegExp(tokenTest));
 assert.doesNotMatch(readFileSync(raportEroare.caleFallback, "utf8"), new RegExp(tokenTest));
 
-delete process.env[NUME_VARIABILA_TOKEN_REPOSITORY_LOG];
-
-const clonaFaraCredential = path.join(dir, "clona-fara-credential");
-let eroareCredentialLipsa;
-try {
-  scrieLogActivitateHook({
-    sessionId: "sesiune-credential-lipsa-test",
-    hookEvent: "UserPromptSubmit",
-    localRepoPath: clonaFaraCredential,
-  });
-} catch (error) {
-  eroareCredentialLipsa = error;
-}
-assert.ok(eroareCredentialLipsa);
-const raportCredentialLipsa = construiesteRaportEroareJurnalizare({
-  error: eroareCredentialLipsa,
-  sessionId: "sesiune-credential-lipsa-test",
-  folderHookRepo: "Hook UserPromptSubmit - test credential lipsa",
+const eroareProxy = new Error(
+  "Command failed: git push origin HEAD:main\n"
+  + "remote: access denied by the git proxy: "
+  + "ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude "
+  + "is not in this session's authorized repository set",
+);
+eroareProxy.code = 128;
+eroareProxy.stderr = "remote: access denied by the git proxy: repository is not in this session's authorized repository set";
+const raportProxy = construiesteRaportEroareJurnalizare({
+  error: eroareProxy,
+  sessionId: "sesiune-proxy-neautorizat-test",
+  folderHookRepo: "Hook UserPromptSubmit - test proxy",
 });
-assert.match(raportCredentialLipsa.diagnosticComun, /etapa=CONFIGURARE_CREDENTIAL_LOG_GITHUB/);
-assert.match(raportCredentialLipsa.diagnosticComun, /cod=CREDENTIAL_LOG_GITHUB_LIPSA/);
-assert.match(raportCredentialLipsa.diagnosticComun, /YL_GARDURI_LOG_GITHUB_TOKEN nu este disponibila/);
-assert.equal(existsSync(clonaFaraCredential), false);
-
-if (tokenAnterior !== undefined) {
-  process.env[NUME_VARIABILA_TOKEN_REPOSITORY_LOG] = tokenAnterior;
-}
+assert.match(raportProxy.diagnosticComun, /remediere=Adauga ion-motica\/YL-Claude-garduri-Log-hooks-scris-de-Claude/);
+assert.match(raportProxy.diagnosticComun, /acces push/);
+assert.match(raportProxy.diagnosticComun, /add_repo/);
 
 console.log("LOG HUMAN + TEHNIC V4 + DIAGNOSTIC EROARE IN CCN SI ADDITIONAL CONTEXT TEST OK");
