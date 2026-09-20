@@ -18,11 +18,10 @@ yl-claude-garduri@skills-dir
 
 Cloud Environment-ul dedicat este `YL-garduri`. `cloud-environment-setup.sh` este bootstrap-ul initial; el nu este mecanismul curent de refresh la fiecare prompt.
 
-Pentru scrierea in repository-ul privat de loguri, sesiunea Claude Code trebuie sa
-aiba repository-ul `ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude` adaugat
-la sursele autorizate, cu acces `push`. Daca proxy-ul Git raporteaza ca repository-ul
-nu este in setul autorizat al sesiunii, se foloseste `add_repo`, apoi se trimite un
-prompt nou pentru retestare. Helperul nu cere si nu injecteaza un PAT propriu.
+Logurile se scriu in branch-ul izolat `loguri-hooks` al repository-ului principal
+`ion-motica/yl`, printr-o clona temporara. Checkout-ul de lucru si branch-ul `master`
+nu sunt modificate de logger. Sesiunea Claude Code are nevoie doar de accesul `push`
+deja acordat repository-ului principal; helperul nu cere si nu injecteaza un PAT.
 
 ## Conventie de organizare a hookurilor
 

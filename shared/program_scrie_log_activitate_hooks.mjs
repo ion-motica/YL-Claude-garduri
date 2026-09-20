@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import {
   appendFileSync,
   existsSync,
+  mkdtempSync,
   mkdirSync,
   readFileSync,
   renameSync,
@@ -15,9 +16,13 @@ import { fileURLToPath } from "node:url";
 export const NUME_FISIER_LOG_HUMAN_READABLE = "log human readable.txt";
 export const NUME_FISIER_LOG_TEHNIC = "log tehnic.txt";
 export const REPOSITORY_LOG_ACTIVITATE_HOOKS =
-  "ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude";
+  "ion-motica/yl";
 export const URL_REPOSITORY_LOG_ACTIVITATE_HOOKS =
   `https://github.com/${REPOSITORY_LOG_ACTIVITATE_HOOKS}.git`;
+export const RAMURA_LOG_ACTIVITATE_HOOKS = "loguri-hooks";
+export const ZILE_PASTRARE_LOGURI = 30;
+
+const NUMAR_MAXIM_INCERCARI_PUSH = 3;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +40,12 @@ export function caleRepositoryLogLocal(sessionId = "fara-sesiune") {
     "repo-log-hooks",
     idSigur(sessionId),
   );
+}
+
+function creeazaCaleRepositoryLogTemporar(sessionId) {
+  const baza = caleRepositoryLogLocal(sessionId);
+  mkdirSync(path.dirname(baza), { recursive: true });
+  return path.join(mkdtempSync(`${baza}-`), "repository");
 }
 
 const NUME_FISIER_DIAGNOSTIC_FALLBACK = "erori jurnalizare hooks.txt";
@@ -149,7 +160,7 @@ function extrageDiagnosticEroareJurnalizare(error) {
     ),
     loguriScriseLocal: error?.detaliiJurnalizare?.loguriScriseLocal === true ? "da" : "nu/necunoscut",
     remediere: repositoryNeautorizatInSesiune
-      ? `Adauga ${REPOSITORY_LOG_ACTIVITATE_HOOKS} la sursele autorizate ale sesiunii Claude Code, cu acces push, folosind add_repo; apoi retrimite un prompt pentru retestare.`
+      ? `Asigura-te ca repository-ul principal ${REPOSITORY_LOG_ACTIVITATE_HOOKS} este in sursele autorizate ale sesiunii Claude Code, cu acces push; apoi retrimite un prompt pentru retestare.`
       : "(nedeterminata automat; consulta mesajul si stderr)",
   };
 }
@@ -451,7 +462,7 @@ export function asiguraRepositoryLogLocal({
   mkdirSync(path.dirname(localRepoPath), { recursive: true });
   ruleazaGit([
     "clone",
-    "--branch", "main",
+    "--branch", RAMURA_LOG_ACTIVITATE_HOOKS,
     "--single-branch",
     remoteUrl,
     localRepoPath,
@@ -462,61 +473,149 @@ export function asiguraRepositoryLogLocal({
 
 function sincronizeazaInainteDeScriere(localRepoPath, remoteUrl) {
   verificaRemoteRepositoryLog(localRepoPath, remoteUrl);
-  ruleazaGit(["-C", localRepoPath, "pull", "--rebase", "origin", "main"]);
+  ruleazaGit([
+    "-C", localRepoPath,
+    "fetch", "origin",
+    `${RAMURA_LOG_ACTIVITATE_HOOKS}:refs/remotes/origin/${RAMURA_LOG_ACTIVITATE_HOOKS}`,
+  ]);
+  ruleazaGit([
+    "-C", localRepoPath,
+    "reset", "--hard",
+    `origin/${RAMURA_LOG_ACTIVITATE_HOOKS}`,
+  ]);
 }
 
-function commitSiPushLoguri(localRepoPath, remoteUrl, mesajCommit) {
+function extrageDataOraDinBloc(bloc) {
+  return bloc.match(/^DATA_ORA: (\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}\.\d{2}) Europe\/Bucharest$/m)?.[1] || "";
+}
+
+function filtreazaBlocuriMaiNoiDecat({ continut, header, separator, now }) {
+  const corp = continut.startsWith(header) ? continut.slice(header.length) : continut;
+  const blocuri = corp
+    .split(new RegExp(`(?=^${separator}$)`, "m"))
+    .filter((bloc) => bloc.trim());
+  const limita = dataOraBucuresti(
+    new Date(now.getTime() - ZILE_PASTRARE_LOGURI * 24 * 60 * 60 * 1000),
+  ).replace(" Europe/Bucharest", "");
+  return blocuri.filter((bloc) => {
+    const dataOra = extrageDataOraDinBloc(bloc);
+    return !dataOra || dataOra >= limita;
+  });
+}
+
+function rescrieLogCuRetentie({ cale, header, separator, blocNou, now }) {
+  const continut = existsSync(cale) ? readFileSync(cale, "utf8") : header;
+  const blocuriPastrate = filtreazaBlocuriMaiNoiDecat({
+    continut,
+    header,
+    separator,
+    now,
+  });
+  if (!blocuriPastrate.includes(blocNou)) blocuriPastrate.push(blocNou);
+  const corp = blocuriPastrate.length ? `${blocuriPastrate.join("\n").trimEnd()}\n` : "";
+  writeFileSync(cale, `${header}${corp}`, "utf8");
+}
+
+function verificaRamuraContineNumaiCeleDouaLoguri(localRepoPath) {
   const fisiere = [
     NUME_FISIER_LOG_HUMAN_READABLE,
     NUME_FISIER_LOG_TEHNIC,
   ];
+  const urmarite = ruleazaGit(["-C", localRepoPath, "ls-files"])
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .sort();
+  const asteptate = [...fisiere].sort();
+  if (JSON.stringify(urmarite) !== JSON.stringify(asteptate)) {
+    const error = new Error(
+      `RAMURA_LOG_CONTINE_FISIERE_NEASTEPTATE: asteptat=${asteptate.join(",")}; efectiv=${urmarite.join(",")}`,
+    );
+    error.code = "RAMURA_LOG_CONTINE_FISIERE_NEASTEPTATE";
+    throw error;
+  }
+}
+
+function scrieCommitSnapshotSiPushCuReincercari({
+  localRepoPath,
+  remoteUrl,
+  mesajCommit,
+  blocHuman,
+  blocTehnic,
+  now,
+}) {
+  const fisiere = [NUME_FISIER_LOG_HUMAN_READABLE, NUME_FISIER_LOG_TEHNIC];
 
   const detalii = {
     repositoryLocal: localRepoPath,
-    loguriScriseLocal: true,
+    repositoryRemote: remoteUrl,
+    loguriScriseLocal: false,
   };
 
-  const stare = ruleazaEtapaJurnalizare("VERIFICARE_SCHIMBARI_LOG", () => ruleazaGit([
-    "-C", localRepoPath,
-    "status", "--porcelain",
-    "--", ...fisiere,
-  ]), detalii);
+  for (let incercare = 1; incercare <= NUMAR_MAXIM_INCERCARI_PUSH; incercare += 1) {
+    if (incercare > 1) {
+      verificaRemoteRepositoryLog(localRepoPath, remoteUrl);
+      ruleazaEtapaJurnalizare(`RESINCRONIZARE_DUPA_PUSH_RESPINS_${incercare}`, () =>
+        sincronizeazaInainteDeScriere(localRepoPath, remoteUrl), detalii);
+    }
 
-  if (!stare) return;
+    verificaRamuraContineNumaiCeleDouaLoguri(localRepoPath);
+    const caleHuman = path.join(localRepoPath, NUME_FISIER_LOG_HUMAN_READABLE);
+    const caleTehnic = path.join(localRepoPath, NUME_FISIER_LOG_TEHNIC);
+    ruleazaEtapaJurnalizare("SCRIERE_LOG_HUMAN_READABLE", () =>
+      rescrieLogCuRetentie({
+        cale: caleHuman,
+        header: HEADER_HUMAN,
+        separator: "=======================================",
+        blocNou: blocHuman,
+        now,
+      }), detalii);
+    ruleazaEtapaJurnalizare("SCRIERE_LOG_TEHNIC", () =>
+      rescrieLogCuRetentie({
+        cale: caleTehnic,
+        header: HEADER_TEHNIC,
+        separator: "============================================================",
+        blocNou: blocTehnic,
+        now,
+      }), detalii);
+    detalii.loguriScriseLocal = true;
 
-  ruleazaEtapaJurnalizare("GIT_ADD_LOGURI", () => ruleazaGit([
-    "-C", localRepoPath,
-    "add", "--",
-    ...fisiere,
-  ]), detalii);
+    ruleazaEtapaJurnalizare("GIT_ADD_LOGURI", () => ruleazaGit([
+      "-C", localRepoPath, "add", "--", ...fisiere,
+    ]), detalii);
 
-  ruleazaEtapaJurnalizare("GIT_COMMIT_LOGURI", () => ruleazaGit([
-    "-C", localRepoPath,
-    "-c", "user.name=YL-Claude-garduri logger",
-    "-c", "user.email=yl-claude-garduri-logger@users.noreply.github.com",
-    "commit",
-    "-m", mesajCommit,
-    "--", ...fisiere,
-  ]), detalii);
+    const commitAsteptat = ruleazaEtapaJurnalizare("CITIRE_COMMIT_REMOTE_ASTEPTAT", () =>
+      ruleazaGit(["-C", localRepoPath, "rev-parse", `origin/${RAMURA_LOG_ACTIVITATE_HOOKS}`]),
+    detalii);
+    const arbore = ruleazaEtapaJurnalizare("GIT_WRITE_TREE_LOGURI", () =>
+      ruleazaGit(["-C", localRepoPath, "write-tree"]), detalii);
+    const commitNou = ruleazaEtapaJurnalizare("GIT_COMMIT_SNAPSHOT_LOGURI", () =>
+      ruleazaGit([
+        "-C", localRepoPath,
+        "-c", "user.name=YL-Claude-garduri logger",
+        "-c", "user.email=yl-claude-garduri-logger@users.noreply.github.com",
+        "commit-tree", arbore,
+        "-m", mesajCommit,
+      ]), detalii);
 
-  try {
-    verificaRemoteRepositoryLog(localRepoPath, remoteUrl);
-    ruleazaGit(["-C", localRepoPath, "push", "origin", "HEAD:main"]);
-  } catch (primaEroarePush) {
     try {
       verificaRemoteRepositoryLog(localRepoPath, remoteUrl);
-      ruleazaEtapaJurnalizare("GIT_PULL_DUPA_PUSH_RESPINS", () =>
-        ruleazaGit(["-C", localRepoPath, "pull", "--rebase", "origin", "main"]),
-      detalii);
-      ruleazaEtapaJurnalizare("GIT_PUSH_REINCERCARE", () =>
-        {
-          verificaRemoteRepositoryLog(localRepoPath, remoteUrl);
-          return ruleazaGit(["-C", localRepoPath, "push", "origin", "HEAD:main"]);
-        },
-      detalii);
+      ruleazaGit([
+        "-C", localRepoPath,
+        "push",
+        `--force-with-lease=refs/heads/${RAMURA_LOG_ACTIVITATE_HOOKS}:${commitAsteptat}`,
+        "origin",
+        `${commitNou}:refs/heads/${RAMURA_LOG_ACTIVITATE_HOOKS}`,
+      ]);
+      ruleazaGit(["-C", localRepoPath, "reset", "--hard", commitNou]);
+      return;
     } catch (error) {
-      if (error instanceof EroareEtapaJurnalizare) throw error;
-      throw new EroareEtapaJurnalizare("GIT_PUSH_INITIAL", primaEroarePush, detalii);
+      if (incercare === NUMAR_MAXIM_INCERCARI_PUSH) {
+        throw new EroareEtapaJurnalizare(
+          `GIT_PUSH_INCERCARE_${incercare}`,
+          error,
+          detalii,
+        );
+      }
     }
   }
 }
@@ -655,16 +754,12 @@ function construiesteBlocTehnic({
   ].join("\n");
 }
 
-function scrieBlocInFisier(caleEfectiva, header, bloc) {
-  mkdirSync(path.dirname(caleEfectiva), { recursive: true });
-  if (!existsSync(caleEfectiva)) {
-    writeFileSync(caleEfectiva, header, "utf8");
-  }
-  appendFileSync(caleEfectiva, `${bloc}\n`, "utf8");
-}
-
 function ruleazaCuBlocareLogger(rootLog, operatie, { timeoutMs = 15000 } = {}) {
-  const caleLock = `${rootLog}.lock`;
+  const caleLock = path.join(
+    os.tmpdir(),
+    "yl-claude-garduri",
+    "blocare-logger-yl-loguri-hooks",
+  );
   ruleazaEtapaJurnalizare("PREGATIRE_DIRECTOR_LOCK_LOGGER", () =>
     mkdirSync(path.dirname(caleLock), { recursive: true }), {
     repositoryLocal: rootLog,
@@ -723,7 +818,8 @@ export function scrieLogActivitateHook({
   localRepoPath = null,
   remoteUrl = URL_REPOSITORY_LOG_ACTIVITATE_HOOKS,
 } = {}) {
-  const rootLog = localRepoPath || caleRepositoryLogLocal(sessionId);
+  const repositoryTemporar = !localRepoPath;
+  const rootLog = localRepoPath || creeazaCaleRepositoryLogTemporar(sessionId);
   try {
     return ruleazaCuBlocareLogger(rootLog, () => {
       const detaliiInainteDeScriere = {
@@ -811,30 +907,19 @@ export function scrieLogActivitateHook({
       now,
     });
 
-    const caleHuman = path.join(rootLog, NUME_FISIER_LOG_HUMAN_READABLE);
-    const caleTehnic = path.join(rootLog, NUME_FISIER_LOG_TEHNIC);
-
-      ruleazaEtapaJurnalizare("SCRIERE_LOG_HUMAN_READABLE", () =>
-        scrieBlocInFisier(caleHuman, HEADER_HUMAN, blocHuman), {
-        ...detaliiInainteDeScriere,
-        loguriScriseLocal: false,
-      });
-      ruleazaEtapaJurnalizare("SCRIERE_LOG_TEHNIC", () =>
-        scrieBlocInFisier(caleTehnic, HEADER_TEHNIC, blocTehnic), {
-        ...detaliiInainteDeScriere,
-        loguriScriseLocal: false,
-      });
-
       const stamp = dataOraBucuresti(now).replace(" Europe/Bucharest", "");
-      commitSiPushLoguri(
-        rootLog,
+      scrieCommitSnapshotSiPushCuReincercari({
+        localRepoPath: rootLog,
         remoteUrl,
-        `Log hook ${hookEvent} ${stamp}`,
-      );
+        mesajCommit: `Snapshot log hook ${hookEvent} ${stamp}`,
+        blocHuman,
+        blocTehnic,
+        now,
+      });
 
       return {
-        humanReadable: caleHuman,
-        tehnic: caleTehnic,
+        humanReadable: path.join(rootLog, NUME_FISIER_LOG_HUMAN_READABLE),
+        tehnic: path.join(rootLog, NUME_FISIER_LOG_TEHNIC),
       };
     });
   } catch (error) {
@@ -851,5 +936,9 @@ export function scrieLogActivitateHook({
       repositoryRemote: remoteUrl,
       loguriScriseLocal: false,
     });
+  } finally {
+    if (repositoryTemporar) {
+      rmSync(path.dirname(rootLog), { recursive: true, force: true });
+    }
   }
 }

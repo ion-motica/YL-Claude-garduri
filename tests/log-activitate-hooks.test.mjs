@@ -13,6 +13,7 @@ import {
   memoreazaTitluSesiune,
   NUME_FISIER_LOG_HUMAN_READABLE,
   NUME_FISIER_LOG_TEHNIC,
+  RAMURA_LOG_ACTIVITATE_HOOKS,
   scrieLogActivitateHook,
 } from "../shared/program_scrie_log_activitate_hooks.mjs";
 
@@ -98,6 +99,17 @@ git([
   "-c", "user.email=test@example.invalid",
   "commit", "-m", "Initial",
 ], sursa);
+git(["checkout", "--orphan", RAMURA_LOG_ACTIVITATE_HOOKS], sursa);
+git(["rm", "-f", "README.md"], sursa);
+writeFileSync(path.join(sursa, NUME_FISIER_LOG_HUMAN_READABLE), "", "utf8");
+writeFileSync(path.join(sursa, NUME_FISIER_LOG_TEHNIC), "", "utf8");
+git(["add", NUME_FISIER_LOG_HUMAN_READABLE, NUME_FISIER_LOG_TEHNIC], sursa);
+git([
+  "-c", "user.name=Test",
+  "-c", "user.email=test@example.invalid",
+  "commit", "-m", "Initial log snapshot",
+], sursa);
+git(["checkout", "main"], sursa);
 git(["clone", "--bare", sursa, remoteBare]);
 
 assert.equal(memoreazaTitluSesiune({
@@ -180,7 +192,7 @@ scrieLogActivitateHook({
 
 const human = git([
   "--git-dir", remoteBare,
-  "show", `main:${NUME_FISIER_LOG_HUMAN_READABLE}`,
+  "show", `${RAMURA_LOG_ACTIVITATE_HOOKS}:${NUME_FISIER_LOG_HUMAN_READABLE}`,
 ]);
 
 assert.match(human, /LOG HUMAN READABLE/);
@@ -211,7 +223,7 @@ assert.doesNotMatch(human, /PERMISSION_DECISION_REASON_BEGIN/);
 
 const tehnic = git([
   "--git-dir", remoteBare,
-  "show", `main:${NUME_FISIER_LOG_TEHNIC}`,
+  "show", `${RAMURA_LOG_ACTIVITATE_HOOKS}:${NUME_FISIER_LOG_TEHNIC}`,
 ]);
 
 assert.match(tehnic, /LOG TEHNIC/);
@@ -248,9 +260,59 @@ assert.match(tehnic, /DETALII_SPECIFICE_GARDULUI_BEGIN\nlista protectie: activa\
 
 const nrCommituri = Number(git([
   "--git-dir", remoteBare,
-  "rev-list", "--count", "main",
+  "rev-list", "--count", RAMURA_LOG_ACTIVITATE_HOOKS,
 ]));
-assert.equal(nrCommituri, 3);
+assert.equal(nrCommituri, 1);
+assert.deepEqual(
+  git(["--git-dir", remoteBare, "ls-tree", "--name-only", RAMURA_LOG_ACTIVITATE_HOOKS])
+    .split(/\r?\n/)
+    .sort(),
+  [NUME_FISIER_LOG_HUMAN_READABLE, NUME_FISIER_LOG_TEHNIC].sort(),
+);
+
+scrieLogActivitateHook({
+  sessionId,
+  promptId: "prompt-dupa-retentie",
+  hookEvent: "UserPromptSubmit",
+  folderHookRepo: "Hook UserPromptSubmit - test retentie",
+  activitate: "a verificat retentia",
+  promptText: "prompt pastrat dupa 30 de zile",
+  humanGarduri: [{
+    folder: "Hook UserPromptSubmit - test retentie",
+    actiuni: ["A eliminat evenimentele expirate."],
+  }],
+  localRepoPath: clonaLogger,
+  remoteUrl: remoteBare,
+  now: new Date("2026-10-20T08:00:00Z"),
+});
+
+const humanDupaRetentie = git([
+  "--git-dir", remoteBare,
+  "show", `${RAMURA_LOG_ACTIVITATE_HOOKS}:${NUME_FISIER_LOG_HUMAN_READABLE}`,
+]);
+assert.doesNotMatch(humanDupaRetentie, /promptul trimis acum/);
+assert.match(humanDupaRetentie, /prompt pastrat dupa 30 de zile/);
+assert.equal(Number(git([
+  "--git-dir", remoteBare,
+  "rev-list", "--count", RAMURA_LOG_ACTIVITATE_HOOKS,
+])), 1);
+
+const rezultatClonaTemporara = scrieLogActivitateHook({
+  sessionId: `sesiune-clona-temporara-${process.pid}-${Date.now()}`,
+  promptId: "prompt-clona-temporara",
+  hookEvent: "UserPromptSubmit",
+  folderHookRepo: "Hook UserPromptSubmit - test clona temporara",
+  activitate: "a scris printr-o clona temporara",
+  promptText: "prompt scris prin clona temporara",
+  remoteUrl: remoteBare,
+  now: new Date("2026-10-20T08:02:00Z"),
+});
+assert.equal(existsSync(rezultatClonaTemporara.humanReadable), false);
+assert.equal(existsSync(rezultatClonaTemporara.tehnic), false);
+assert.match(git([
+  "--git-dir", remoteBare,
+  "show", `${RAMURA_LOG_ACTIVITATE_HOOKS}:${NUME_FISIER_LOG_HUMAN_READABLE}`,
+]), /prompt scris prin clona temporara/);
 
 let eroareRemoteNepotrivit;
 try {
@@ -320,9 +382,9 @@ assert.doesNotMatch(raportEroare.additionalContext, new RegExp(tokenTest));
 assert.doesNotMatch(readFileSync(raportEroare.caleFallback, "utf8"), new RegExp(tokenTest));
 
 const eroareProxy = new Error(
-  "Command failed: git push origin HEAD:main\n"
+  "Command failed: git push origin loguri-hooks\n"
   + "remote: access denied by the git proxy: "
-  + "ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude "
+  + "ion-motica/yl "
   + "is not in this session's authorized repository set",
 );
 eroareProxy.code = 128;
@@ -332,8 +394,7 @@ const raportProxy = construiesteRaportEroareJurnalizare({
   sessionId: "sesiune-proxy-neautorizat-test",
   folderHookRepo: "Hook UserPromptSubmit - test proxy",
 });
-assert.match(raportProxy.diagnosticComun, /remediere=Adauga ion-motica\/YL-Claude-garduri-Log-hooks-scris-de-Claude/);
+assert.match(raportProxy.diagnosticComun, /remediere=Asigura-te ca repository-ul principal ion-motica\/yl/);
 assert.match(raportProxy.diagnosticComun, /acces push/);
-assert.match(raportProxy.diagnosticComun, /add_repo/);
 
 console.log("LOG HUMAN + TEHNIC V4 + DIAGNOSTIC EROARE IN CCN SI ADDITIONAL CONTEXT TEST OK");

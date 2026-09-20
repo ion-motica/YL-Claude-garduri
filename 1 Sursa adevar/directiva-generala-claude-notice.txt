@@ -68,9 +68,12 @@ Toate hookurile existente si viitoare folosesc acest helper.
 Nu crea logger separat intr-un hook; daca se schimba destinatia sau formatul logului,
 schimbarea se face in helperul comun.
 
-Detaliile se scriu persistent in repository-ul separat:
+Detaliile se scriu persistent in repository-ul principal:
 
-ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude
+ion-motica/yl
+
+Destinatia este exclusiv branch-ul orfan `loguri-hooks`. Branch-ul `master` si
+checkout-ul de lucru YL nu contin logurile si nu sunt modificate de logger.
 
 Exista DOUA fisiere de log, produse de acelasi helper comun si acelasi apel al gardului:
 
@@ -132,24 +135,36 @@ DETALII_SPECIFICE_GARDULUI contin informatiile suplimentare pe care numai gardul
 le poate cunoaste: de exemplu status updater, hashuri de configuratie, liste PERMISE/INTERZISE,
 trigger-ele si reminderele selectate sau alte date de diagnostic.
 
-Helperul comun foloseste o clona tehnica separata, in /tmp, pentru fiecare sesiune.
+Helperul comun foloseste o clona tehnica temporara separata, in /tmp, pentru fiecare
+intrare de log. Clona se sterge la final.
 La fiecare intrare de log:
-- sincronizeaza clona cu branch-ul main;
+- sincronizeaza clona cu branch-ul `loguri-hooks` din `ion-motica/yl`;
 - scrie AMBELE fisiere;
-- face UN SINGUR commit pentru ambele;
-- face push pe main.
+- elimina din versiunea curenta evenimentele mai vechi de 30 de zile;
+- publica un snapshot cu AMBELE fisiere intr-un singur commit-radacina;
+- foloseste `force-with-lease`, nu force orb;
+- daca alt chat a publicat intre timp, reincarca snapshotul curent, reaplica
+  evenimentul si incearca din nou, de maximum 3 ori.
 
-Repository-ul de lucru YL nu mai este destinatia logului si nu trebuie murdarit
-de logging. Hookurile individuale nu implementeaza clone/pull/commit/push si nu au
-logger separat; toata aceasta responsabilitate ramane numai in helperul comun.
+Checkout-ul de lucru YL nu este destinatia locala a logului si nu trebuie murdarit
+de logging. Doar branch-ul remote izolat `loguri-hooks` este destinatia persistenta.
+Hookurile individuale nu implementeaza clone/fetch/commit/push si nu au logger separat;
+toata aceasta responsabilitate ramane numai in helperul comun.
 
-Pentru repository-ul remote exact de logging, sesiunea Claude Code trebuie sa aiba
-`ion-motica/YL-Claude-garduri-Log-hooks-scris-de-Claude` in sursele autorizate, cu
-acces push. Helperul nu cere si nu injecteaza un PAT propriu. Inainte de fiecare
+Sesiunea Claude Code trebuie sa aiba repository-ul principal `ion-motica/yl` in
+sursele autorizate, cu acces push. Nu este necesar un al doilea repository si nici
+un PAT propriu. Inainte de fiecare
 operatie de retea, URL-ul efectiv al remote-ului origin trebuie sa coincida exact
 cu URL-ul canonic asteptat; orice abatere opreste operatia. Daca proxy-ul Git spune
 ca repository-ul nu este in setul autorizat al sesiunii, diagnosticul trebuie sa
-indice explicit folosirea `add_repo` cu acces push si retrimiterea unui prompt.
+indice explicit verificarea accesului push la repository-ul principal si retrimiterea
+unui prompt.
+
+Branch-ul `loguri-hooks` trebuie sa contina exact doua fisiere urmarite:
+- `log human readable.txt`;
+- `log tehnic.txt`.
+
+Formatul existent al logului human readable ramane neschimbat.
 
 In ambele loguri se folosesc randuri normale cu newline.
 Nu comprima logul cu " | ".
