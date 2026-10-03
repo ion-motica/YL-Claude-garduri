@@ -26,6 +26,11 @@ blocheazaEditareFisiereSiFoldere {
   1 Hook Tests/momeala_PRETOOLUSE_cu_exceptie.txt
 }
 
+// Exceptie temporara: adaugarea intrarii "maioneza1" in DEFAULT_ORDER (task Maioneza 1).
+permiteEditarePanaLa(2026.10.03-23.59 Europe/Bucharest) {
+  js/cp-registry.js
+}
+
 permiteEditarePanaLa(2026.09.30-18.00 Europe/Bucharest) {
   1 Hook Tests/momeala_PRETOOLUSE_cu_exceptie.txt
 }
