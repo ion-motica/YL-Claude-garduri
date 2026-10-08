@@ -27,7 +27,7 @@ blocheazaEditareFisiereSiFoldere {
 }
 
 // Exceptie temporara: adaugarea intrarii "maioneza1" in DEFAULT_ORDER (task Maioneza 1).
-permiteEditarePanaLa(2026.10.08-23.59 Europe/Bucharest) {
+permiteEditarePanaLa(2026.10.15-23.59 Europe/Bucharest) {
   js/cp-registry.js
 }
 
